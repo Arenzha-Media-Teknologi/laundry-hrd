@@ -350,7 +350,7 @@
                         <div>
                             <h4>Potongan</h4>
                             <div class="table-responsive">
-                                <table class="table table-striped">
+                                <table class="table table-striped align-middle">
                                     <thead>
                                         <tr class="fw-bold fs-6 text-gray-800 border-bottom border-gray-200">
                                             <th></th>
@@ -373,7 +373,7 @@
                                             <td><span :class="!selectedDetailSalary.include_deposit ? 'text-decoration-line-through fst-italic' : ''">Deposit</span></td>
                                             <td class="text-end"><span :class="!selectedDetailSalary.include_deposit ? 'text-decoration-line-through fst-italic' : ''">@{{ currencyFormat(selectedDetailSalary.total_unpaid_deposits) }}</span></td>
                                         </tr>
-                                        <tr v-if="selectedDetailSalary.total_loan > 0" class="fw-bold fs-6 text-gray-700">
+                                        <!-- <tr v-if="selectedDetailSalary.total_loan > 0" class="fw-bold fs-6 text-gray-700">
                                             <td style="width: 50px;">
                                                 <div class="form-check form-check-custom form-check-primary">
                                                     <input class="form-check-input" type="checkbox" v-model="selectedDetailSalary.include_loan" @change="onChangeIncludeLoan(selectedDetailSalary)" />
@@ -381,6 +381,25 @@
                                             </td>
                                             <td><span :class="!selectedDetailSalary.include_loan ? 'text-decoration-line-through fst-italic' : ''">Kasbon</span></td>
                                             <td class="text-end"><span :class="!selectedDetailSalary.include_loan ? 'text-decoration-line-through fst-italic' : ''">@{{ currencyFormat(selectedDetailSalary.total_loan) }}</span></td>
+                                        </tr> -->
+                                        <tr class="fw-bold fs-6 text-gray-700">
+                                            <td style="width: 50px;">
+                                                <div class="form-check form-check-custom form-check-primary">
+                                                    <input class="form-check-input" type="checkbox" v-model="selectedDetailSalary.include_loan" @change="onChangeIncludeLoan(selectedDetailSalary)" />
+                                                </div>
+                                            </td>
+                                            <td><span :class="!selectedDetailSalary.include_loan ? 'text-decoration-line-through fst-italic' : ''">Kasbon</span></td>
+                                            <!-- <td class="text-end"><span :class="!selectedDetailSalary.include_loan ? 'text-decoration-line-through fst-italic' : ''">@{{ currencyFormat(selectedDetailSalary.total_loan) }}</span></td> -->
+                                            <td class="text-end">
+                                                <div class="d-flex justify-content-end">
+                                                    <select v-model="selectedDetailSalary.selected_loan_id" class="form-select" style="width: 300px;">
+                                                        <option value="">Pilih Kasbon</option>
+                                                        <template v-for="loan in selectedDetailSalary?.loans">
+                                                            <option v-for="loanItem in selectedDetailSalary?.loan_items" :value="loanItem.id">@{{ loan.description }} - Cicilan @{{ moment(loanItem?.payment_date).format('MMM YYYY') }} - Rp @{{ loanItem?.basic_payment?.toLocaleString('De-de') }}</option>
+                                                        </template>
+                                                    </select>
+                                                </div>
+                                            </td>
                                         </tr>
                                     </tbody>
                                     <tfoot>
@@ -598,6 +617,9 @@
             }
         },
         methods: {
+            moment(date) {
+                return moment(date);
+            },
             onChangeIncludeDeposit(selectedDetailSalary) {
                 this.$nextTick(() => {
                     const includeDeposit = selectedDetailSalary.include_deposit;
@@ -624,12 +646,52 @@
                     // console.log();
                 });
             },
-            onChangeIncludeLoan(selectedDetailSalary) {
+            onChangeIncludeLoan(selectedDetailSalary, previousSelectedLoanId = null) {
                 this.$nextTick(() => {
-                    const includeLoan = selectedDetailSalary.include_loan;
+                    // const includeLoan = selectedDetailSalary.include_loan;
+                    // if(includeLoan) {
+                    //     selectedDetailSalary.summary.total_deductions += selectedDetailSalary.total_loan;
+                    // } else {
+                    //     selectedDetailSalary.summary.total_deductions -= selectedDetailSalary.total_loan;
+                    // }
+
+                    // selectedDetailSalary.summary.take_home_pay = selectedDetailSalary.summary.total_incomes - selectedDetailSalary.summary.total_deductions;
+
+
+
+                    // if (!selectedLoanId) {
+                    //     totalLoan = 0;
+                    // }
+
+                    const includeLoan = selectedDetailSalary?.include_loan;
+
+                    let previousTotalLoan = 0;
+                    if (previousSelectedLoanId) {
+                        const [selectedPreviousLoan] = selectedDetailSalary?.loan_items.filter(loanItem => loanItem.id == previousSelectedLoanId);
+                        if (selectedPreviousLoan) {
+                            previousTotalLoan = selectedPreviousLoan?.basic_payment || 0;
+                        }
+                    }
+
+                    const selectedLoanId = selectedDetailSalary?.selected_loan_id;
+                    const [selectedLoan] = selectedDetailSalary?.loan_items.filter(loanItem => loanItem.id == selectedLoanId);
+
+                    let totalLoan = 0;
+
+                    if (selectedLoan) {
+                        totalLoan = selectedLoan?.basic_payment;
+                    }
+                    totalLoan = totalLoan - previousTotalLoan;
+
                     if (includeLoan) {
-                        selectedDetailSalary.summary.total_deductions += selectedDetailSalary.total_loan;
+
+                        console.log('selected loan', selectedLoan);
+                        selectedDetailSalary.total_loan = totalLoan;
+                        selectedDetailSalary.summary.total_deductions += totalLoan;
                     } else {
+                        if (!selectedLoanId) {
+                            selectedDetailSalary.total_loan = 0;
+                        }
                         selectedDetailSalary.summary.total_deductions -= selectedDetailSalary.total_loan;
                     }
 
@@ -793,6 +855,14 @@
                     document.getElementById('checkAll').checked = true;
                 }
             },
+            'selectedDetailSalary.selected_loan_id': function(newValue, oldValue) {
+                const self = this;
+                if (this.selectedDetailSalary) {
+                    this.onChangeIncludeLoan(this.selectedDetailSalary, oldValue);
+                    // console.log('changed', newValue);
+                    // console.log(this.selectedDetailSalary);
+                };
+            }
         }
     })
 </script>

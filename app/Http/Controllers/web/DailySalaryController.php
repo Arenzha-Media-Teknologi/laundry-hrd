@@ -156,8 +156,14 @@ class DailySalaryController extends Controller
                     })->all();
                 $allDepositItemIds[] = $depositItemIds;
 
+                //! OLD
+                // $loanItemIds = collect($deductions)->where('type', 'loan')
+                //     ->flatMap(function ($loanItem) {
+                //         return $loanItem['id'] ?? 0;
+                //     })->all();
+                //* NEW
                 $loanItemIds = collect($deductions)->where('type', 'loan')
-                    ->flatMap(function ($loanItem) {
+                    ->map(function ($loanItem) {
                         return $loanItem['id'] ?? 0;
                     })->all();
                 $allLoanItemIds[] = $loanItemIds;
@@ -520,7 +526,8 @@ class DailySalaryController extends Controller
                 },
                 'loans' => function ($q) use ($startDate, $endDate) {
                     $q->with(['items' => function ($itemQuery) use ($startDate, $endDate) {
-                        $itemQuery->where('paid', 0)->whereBetween('payment_date', [$startDate, $endDate]);
+                        $itemQuery->where('paid', 0);
+                        // ->whereBetween('payment_date', [$startDate, $endDate]);
                     }]);
                 }
             ])->where('aerplus_daily_salary', 1)->where('active', 1)->get();
@@ -720,7 +727,8 @@ class DailySalaryController extends Controller
                     return $salaryDepositItem !== null;
                 });
 
-                $totalLoan = $loanItems->sum('basic_payment');
+                $totalLoan = 0;
+                // $totalLoan = $loanItems->sum('basic_payment');
                 $loanCount = $loanItems->count();
 
                 $additionalIncomes = [];
@@ -741,6 +749,10 @@ class DailySalaryController extends Controller
                 $totalDeductions = $lateCharge + $totalUnpaidDeposit + $totalLoan;
                 $takeHomePay = $totalIncomes - $totalDeductions;
 
+                $allLoanItems = collect($employee->loans)->flatMap(function ($loan) {
+                    return $loan->items;
+                })->all();
+
                 return [
                     'employee' => collect($employee)->except('attendances')->all(),
                     'periods' => $periods,
@@ -752,9 +764,14 @@ class DailySalaryController extends Controller
                     'total_unpaid_deposits' => $totalUnpaidDeposit,
                     'total_unredeemed_deposits' => $totalUnredeemedDeposit,
                     'total_loan' => $totalLoan,
+                    // 'total_loan' => 0,
                     'include_deposit' => $unpaidDepositCount > 0 ? true : false,
                     'include_unredeemed_deposit' => false,
-                    'include_loan' => $loanCount > 0 ? true : false,
+                    // 'include_loan' => $loanCount > 0 ? true : false,
+                    'include_loan' => false,
+                    'loans' => $employee->loans,
+                    'loan_items' => $allLoanItems,
+                    'selected_loan_id' => '',
                     'list_unpaid_deposits' => $unpaidDeposit->values()->all(),
                     'list_unredeemed_deposits' => $unredeemedDeposit->values()->all(),
                     'list_loans' => $loanItems->values()->all(),
@@ -911,8 +928,22 @@ class DailySalaryController extends Controller
                     ]);
                 }
 
+                //! OLD
+                // if ($salary['include_loan'] == true) {
+                //     $rawLoanItemsIds = collect($salary['list_loans'])->pluck('id')->all();
+                //     $loanItemsIds[] = $rawLoanItemsIds;
+
+                //     array_push($deductions, [
+                //         'name' => 'Kasbon',
+                //         'type' => 'loan',
+                //         'value' => $salary['total_loan'],
+                //         'id' => $rawLoanItemsIds,
+                //     ]);
+                // }
+
+                //* NEW
                 if ($salary['include_loan'] == true) {
-                    $rawLoanItemsIds = collect($salary['list_loans'])->pluck('id')->all();
+                    $rawLoanItemsIds = $salary['selected_loan_id'];
                     $loanItemsIds[] = $rawLoanItemsIds;
 
                     array_push($deductions, [

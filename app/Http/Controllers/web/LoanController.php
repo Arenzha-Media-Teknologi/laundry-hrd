@@ -44,10 +44,20 @@ class LoanController extends Controller
 
         $totalLoans = LoanItem::sum('basic_payment');
         $totalLoansCount = Loan::count();
-        $totalPaidLoans = LoanItem::whereHas('salaryItem')->sum('basic_payment');
-        $totalPaidLoansCount = LoanItem::whereHas('salaryItem')->count();
-        $totalUnpaidLoans = LoanItem::whereDoesntHave('salaryItem')->sum('basic_payment');
-        $totalUnpaidLoansCount = LoanItem::whereDoesntHave('salaryItem')->count();
+        $totalPaidLoans = LoanItem::whereHas('salaryItem')->orWhere('paid', 1)->sum('basic_payment');
+        $totalPaidLoansCount = LoanItem::whereHas('salaryItem')->orWhere('paid', 1)->count();
+        $totalUnpaidLoans = LoanItem::where(function ($query) {
+            $query->whereDoesntHave('salaryItem')
+                ->where('paid', 0);
+        })
+            ->sum('basic_payment');
+
+        $totalUnpaidLoansCount = LoanItem::where(function ($query) {
+            $query->whereDoesntHave('salaryItem')
+                ->where('paid', 0);
+        })
+            ->count();
+        // dd($query->toSql(), $query->getBindings());
 
         // return $totalLoans;
 
@@ -131,6 +141,7 @@ class LoanController extends Controller
                     'installment_order' => $index + 1,
                     'payment_date' => $item['paymentDate'],
                     'basic_payment' => $item['paymentAmount'],
+                    'paid' => 0,
                     'created_at' => Carbon::now()->toDateTimeString(),
                     'updated_at' => Carbon::now()->toDateTimeString(),
                 ];
