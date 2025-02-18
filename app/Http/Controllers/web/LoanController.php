@@ -42,18 +42,20 @@ class LoanController extends Controller
     {
         $loans = Loan::with(['employee'])->get();
 
-        $totalLoans = LoanItem::sum('basic_payment');
+        $totalLoans = LoanItem::whereHas('loan')->sum('basic_payment');
         $totalLoansCount = Loan::count();
-        $totalPaidLoans = LoanItem::whereHas('salaryItem')->orWhere('paid', 1)->sum('basic_payment');
-        $totalPaidLoansCount = LoanItem::whereHas('salaryItem')->orWhere('paid', 1)->count();
+        $totalPaidLoans = LoanItem::whereHas('salaryItem')->whereHas('loan')->orWhere('paid', 1)->sum('basic_payment');
+        $totalPaidLoansCount = LoanItem::whereHas('salaryItem')->whereHas('loan')->orWhere('paid', 1)->count();
         $totalUnpaidLoans = LoanItem::where(function ($query) {
             $query->whereDoesntHave('salaryItem')
+                ->whereHas('loan')
                 ->where('paid', 0);
         })
             ->sum('basic_payment');
 
         $totalUnpaidLoansCount = LoanItem::where(function ($query) {
             $query->whereDoesntHave('salaryItem')
+                ->whereHas('loan')
                 ->where('paid', 0);
         })
             ->count();

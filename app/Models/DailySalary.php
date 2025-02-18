@@ -15,4 +15,9 @@ class DailySalary extends Model
     {
         return $this->belongsTo(Employee::class);
     }
+
+    public function office()
+    {
+        return $this->belongsTo(Office::class);
+    }
 }

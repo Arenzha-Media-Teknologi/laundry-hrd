@@ -2025,14 +2025,14 @@ class PayrollController extends Controller
 
                 $totalDeposit = collect($deductions)->where('type', 'deposit')->sum('value');
                 $totalLateFee = collect($deductions)->where('type', 'late_fee')->sum('value');
-                $totalAllLoan = collect($deductions)->where('type', 'loan')->sum('value');
+                $totalLoan = collect($deductions)->where('type', 'loan')->sum('value');
                 // return $totalDeposit;
                 // $dailySalary->total_deposit = $totalDeposit;
                 // $dailySalary->total_redeem_deposit = $totalRedeemDeposit;
                 $totalAllDeposit += $totalDeposit;
                 $totalAllRedeemDeposit += $totalRedeemDeposit;
                 $totalAllLateFee += $totalLateFee;
-                $totalAllLoan += 0;
+                $totalAllLoan += $totalLoan;
             });
 
             $officeName = collect($offices)->where('id', $officeId)->first()->name ?? '';
@@ -2068,7 +2068,7 @@ class PayrollController extends Controller
             if ($totalAllLoan > 0) {
                 $additionalCredit[] = [
                     'amount' => $totalAllLoan,
-                    'account_id' => 86,
+                    'account_id' => 79,
                 ];
             }
 

@@ -306,13 +306,13 @@
                             type: 'DEBIT',
                             amount: this.model.amount,
                             description: description,
-                            account_id: 83,
+                            account_id: 79,
                         },
                         {
                             type: 'CREDIT',
                             amount: this.model.amount,
                             description: description,
-                            account_id: 5,
+                            account_id: 78,
                         },
                     ],
                 }
@@ -479,26 +479,26 @@
 
                         const AERPLUS_DIVISION_ID = 12;
 
-                        if (self.selectedEmployee?.office?.division_id == AERPLUS_DIVISION_ID) {
-                            const data = response?.data?.data;
-                            toastr.info(message + '. Membuat jurnal...');
+                        const data = response?.data?.data;
+                        toastr.info(message + '. Membuat jurnal...');
 
-                            const journalResponse = await axios.post('{{ env("AERPLUS_URL") }}/api/v1/journals', {
-                                ...self.journalPayload,
-                                journalable_id: data?.id
-                            });
+                        const journalResponse = await axios.post('{{ env("AERPLUS_URL") }}/api/v1/journals', {
+                            ...self.journalPayload,
+                            journalable_id: data?.id
+                        });
 
-                            if (journalResponse) {
-                                message = response?.data?.message;
-                                if (!message) {
-                                    message = 'Data berhasil disimpan'
-                                }
-
-                                toastr.success(message);
+                        if (journalResponse) {
+                            message = response?.data?.message;
+                            if (!message) {
+                                message = 'Data berhasil disimpan'
                             }
-                        } else {
+
                             toastr.success(message);
                         }
+                        // if (self.selectedEmployee?.office?.division_id == AERPLUS_DIVISION_ID) {
+                        // } else {
+                        //     toastr.success(message);
+                        // }
                     }
                 } catch (error) {
                     let message = error?.response?.data?.message;

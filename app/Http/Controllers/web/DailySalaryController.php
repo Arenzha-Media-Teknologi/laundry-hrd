@@ -693,6 +693,8 @@ class DailySalaryController extends Controller
                     $lateCharge = $employeeWage['daily'];
                 }
 
+                $lateCharge = 0;
+
                 /**
                  * Deposit
                  */
@@ -760,6 +762,7 @@ class DailySalaryController extends Controller
                     'additional_incomes' => $additionalIncomes,
                     'total_time_late' => $totalTimeLate,
                     'late_charge' => $lateCharge,
+                    // 'late_charge' => 0,
                     'number_of_days' => $numberOfDays + 1,
                     'total_unpaid_deposits' => $totalUnpaidDeposit,
                     'total_unredeemed_deposits' => $totalUnredeemedDeposit,
@@ -890,6 +893,7 @@ class DailySalaryController extends Controller
 
             $dailySalaries = collect($salaries)->map(function ($salary) use ($startDate, $endDate, &$salaryDepositItemsIds, &$salaryDepositIds, &$loanItemsIds) {
                 $employeeId = $salary['employee']['id'];
+                $officeId = $salary['employee']['office_id'] ?? null;
 
                 $incomes = $salary['periods'];
 
@@ -970,6 +974,7 @@ class DailySalaryController extends Controller
                     'take_home_pay' => $takeHomePay,
                     'description' => null,
                     'employee_id' => $employeeId,
+                    'office_id' => $officeId,
                     'created_at' => Carbon::now()->toDateTimeString(),
                     'updated_at' => Carbon::now()->toDateTimeString(),
                 ];
@@ -1033,7 +1038,7 @@ class DailySalaryController extends Controller
                 throw new Error('params "start_date" and "end_date" are required');
             }
 
-            $dailySalaries = DailySalary::with(['employee' => function ($employeeQuery) {
+            $dailySalaries = DailySalary::with(['office', 'employee' => function ($employeeQuery) {
                 $employeeQuery->with(['office', 'bankAccounts']);
             }])
                 ->where('type', 'aerplus')
@@ -1061,6 +1066,14 @@ class DailySalaryController extends Controller
                         $bankAccountOwner = $defaultBankAccount->account_owner ?? '';
                         $bankAccountNumber = $defaultBankAccount->account_number ?? '';
 
+                        // if (($employee->office ?? null) !== null) {
+                        //     $office = $employee->office->name ?? '';
+                        // }
+                    }
+
+                    if ($dailySalary->office != null) {
+                        $office = $dailySalary->office->name;
+                    } else {
                         if (($employee->office ?? null) !== null) {
                             $office = $employee->office->name ?? '';
                         }
@@ -1137,10 +1150,10 @@ class DailySalaryController extends Controller
 
             $dailySalariesByOffices = collect($dailySalaries)
                 ->sortBy(function ($dailySalary) {
-                    return $dailySalary->employee->office->id ?? 0;
+                    return $dailySalary->office_id ?? $dailySalary->employee->office->id ?? 0;
                 })
                 ->groupBy(function ($dailySalary) {
-                    return $dailySalary->employee->office->id ?? 0;
+                    return $dailySalary->office_id ?? $dailySalary->employee->office->id ?? 0;
                 })->map(function ($dailySalaries, $officeId) use ($offices, $startDate, $endDate) {
                     $totalOutletTakeHomePay = collect($dailySalaries)->sum('take_home_pay');
                     $officeName = collect($offices)->where('id', $officeId)->first()->name ?? '';
