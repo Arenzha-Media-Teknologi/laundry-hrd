@@ -11,7 +11,7 @@
 
 @section('content')
 <?php
-$groupPermissions = auth()->user()->employee->credential->group->permissions ?? "[]";
+$groupPermissions = auth()->user()->group->permissions ?? "[]";
 $permissions = json_decode($groupPermissions);
 ?>
 <div id="kt_content_container" class="container-xxl">

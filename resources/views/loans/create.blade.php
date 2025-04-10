@@ -482,7 +482,7 @@
                         const data = response?.data?.data;
                         toastr.info(message + '. Membuat jurnal...');
 
-                        const journalResponse = await axios.post('{{ env("AERPLUS_URL") }}/api/v1/journals', {
+                        const journalResponse = await axios.post('{{ env("OPERATIONAL_URL") }}/api/v1/journals', {
                             ...self.journalPayload,
                             journalable_id: data?.id
                         });

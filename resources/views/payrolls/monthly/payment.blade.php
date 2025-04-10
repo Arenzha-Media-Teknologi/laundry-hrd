@@ -793,7 +793,7 @@
                 try {
                     self.getTotalSalesPerOutletLoading = true;
 
-                    // const response = await axios.get(`{{ env('AERPLUS_URL') }}/api/v1/outlet-sale-invoices/total-sales-per-outlet?start_date=${self.startDate}&end_date=${self.endDate}&exclude_outlet_ids=[]`);
+                    // const response = await axios.get(`{{ env('OPERATIONAL_URL') }}/api/v1/outlet-sale-invoices/total-sales-per-outlet?start_date=${self.startDate}&end_date=${self.endDate}&exclude_outlet_ids=[]`);
                     const response = await axios.get(`https://aerplus3.magentamediatama.net/api/v1/outlet-sale-invoices/total-sales-per-outlet?start_date=${self.startDate}&end_date=${self.endDate}&exclude_outlet_ids=[]`);
 
                     if (response) {
@@ -1020,7 +1020,7 @@
                 const self = this;
                 try {
                     // const response1 = true;
-                    const response1 = await axios.post('{{ env("AERPLUS_URL") }}/api/v1/outlet-spendings/store-monthly-salary-payment', {
+                    const response1 = await axios.post('{{ env("OPERATIONAL_URL") }}/api/v1/outlet-spendings/store-monthly-salary-payment', {
                         outlet_spending_payloads: self.payload,
                     });
 

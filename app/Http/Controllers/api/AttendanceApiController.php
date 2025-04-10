@@ -9,6 +9,7 @@ use App\Models\Employee;
 use App\Models\LeaveApplication;
 use App\Models\SickApplication;
 use App\Models\WorkingPattern;
+use App\Models\WorkScheduleItem;
 use Carbon\Carbon;
 use Error;
 use Exception;
@@ -585,7 +586,7 @@ class AttendanceApiController extends Controller
                 ->first();
 
             if ($todayAttendance !== null) {
-                throw new Exception('Anda sudah clock in hari ini');
+                throw new Exception('Kamu sudah clock in hari ini');
             }
 
             $employee = Employee::find($employeeId);
@@ -596,6 +597,15 @@ class AttendanceApiController extends Controller
 
             if ($employee->active == 0) {
                 throw new Exception('Pegawai nonaktif tidak dapat melakukan clock in');
+            }
+
+            $todayWorkSchedule = WorkScheduleItem::where('employee_id', $employeeId)->where('date', $attendanceDate)->first();
+
+            if ($todayWorkSchedule != null) {
+                $isOff = $todayWorkSchedule->is_off;
+                if ($isOff == 1) {
+                    throw new Error('Gagal absen, jadwal kamu OFF hari ini');
+                }
             }
 
             $timeLate = 0;
@@ -690,7 +700,7 @@ class AttendanceApiController extends Controller
                 'data' => $attendance,
                 'code' => 200,
             ]);
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             return response()->json([
                 'message' => $e->getMessage(),
                 'code' => 500,
@@ -1278,6 +1288,15 @@ class AttendanceApiController extends Controller
 
             if ($employee->active == 0) {
                 throw new Exception('Pegawai nonaktif tidak dapat melakukan clock out');
+            }
+
+            $todayWorkSchedule = WorkScheduleItem::where('employee_id', $employeeId)->where('date', $attendanceDate)->first();
+
+            if ($todayWorkSchedule != null) {
+                $isOff = $todayWorkSchedule->is_off;
+                if ($isOff == 1) {
+                    throw new Error('Gagal absen, jadwal kamu OFF hari ini');
+                }
             }
 
             $calendarHolidays = [];

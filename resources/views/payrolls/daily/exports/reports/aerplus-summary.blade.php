@@ -10,6 +10,7 @@ $columnsCount = 2;
             <td colspan="{{ $columnsCount }}" style="text-align: center;"><strong>Periode {{\Carbon\Carbon::parse($start_date)->format('d/m/Y')}} - {{\Carbon\Carbon::parse($end_date)->format('d/m/Y')}}</strong></td>
         </tr>
         <tr>
+            <th><strong>CV</strong></th>
             <th><strong>Depot</strong></th>
             <th style="text-align: right;"><strong>Total Gaji</strong></th>
         </tr>
@@ -20,6 +21,7 @@ $columnsCount = 2;
         ?>
         @foreach($daily_salaries as $daily_salary)
         <tr>
+            <td>{{ $daily_salary['cv_name'] ?? '-' }}</td>
             <td>{{ $daily_salary['depot'] ?? '' }}</td>
             <td data-format="#,##0_-">{{ $daily_salary['total'] ?? 0 }}</td>
         </tr>
@@ -30,7 +32,7 @@ $columnsCount = 2;
     </tbody>
     <tfoot>
         <tr>
-            <th><strong>TOTAL</strong></th>
+            <th colspan="2"><strong>TOTAL</strong></th>
             <th data-format="#,##0_-"><strong>{{ $grandTotal }}</strong></th>
         </tr>
     </tfoot>

@@ -9,7 +9,7 @@ $permissions = json_decode($groupPermissions);
         <!--begin::Logo-->
         <a href="/" class="text-white fs-1">
             <!-- <img alt="Logo" src="{{asset('assets/media/logos/logo-1-dark.svg')}}" class="h-25px logo" /> -->
-            <span class="logo">Roket<strong class="text-danger">HR</strong></span>
+            <span class="logo">Laundry<strong class="text-success">HR</strong></span>
         </a>
         <!--end::Logo-->
         <!--begin::Aside toggler-->
@@ -167,7 +167,8 @@ $permissions = json_decode($groupPermissions);
                 $isLeavesRoute = request()->is('leaves*');
                 $isWorkingPatternsRoute = request()->is('working-patterns*');
                 $isOvertimeApplicationRoute = request()->is('overtime-applications-v2*');
-                $isAttendanceRouteGroup = $isAttendancesRoute || $isTimeOffsRoute || $isWorkingPatternsRoute || $isLeavesRoute || $isImportAttendancesRoute || $isOvertimeApplicationRoute;
+                $isWorkScheduleRoute = request()->is('work-schedules*');
+                $isAttendanceRouteGroup = $isAttendancesRoute || $isTimeOffsRoute || $isWorkingPatternsRoute || $isLeavesRoute || $isImportAttendancesRoute || $isOvertimeApplicationRoute || $isWorkScheduleRoute;
 
                 $canViewTimeOff = Auth::user()->can('view', App\Models\SickApplication::class) || Auth::user()->can('view', App\Models\LeaveApplication::class);
 
@@ -251,6 +252,16 @@ $permissions = json_decode($groupPermissions);
                                     <span class="bullet bullet-dot"></span>
                                 </span>
                                 <span class="menu-title">Pengajuan Lembur</span>
+                            </a>
+                        </div>
+                        @endif
+                        @if(in_array('view_work_schedule', $permissions))
+                        <div class="menu-item">
+                            <a class="menu-link <?= $isWorkScheduleRoute ? 'active' : '' ?>" href="/work-schedules">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Jadwal Kerja</span>
                             </a>
                         </div>
                         @endif

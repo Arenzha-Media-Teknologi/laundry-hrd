@@ -1038,6 +1038,15 @@ class DailySalaryController extends Controller
                 throw new Error('params "start_date" and "end_date" are required');
             }
 
+            $response = Http::get(env('OPERATIONAL_URL') . '/api/v1/outlets/office-sync');
+
+            $outlets = [];
+            if ($response->successful()) {
+                $outlets = $response->json()['data'];
+            }
+
+            // return $outlets;
+
             $dailySalaries = DailySalary::with(['office', 'employee' => function ($employeeQuery) {
                 $employeeQuery->with(['office', 'bankAccounts']);
             }])
@@ -1045,7 +1054,7 @@ class DailySalaryController extends Controller
                 ->where('start_date', $startDate)
                 ->where('end_date', $endDate)
                 ->get()
-                ->map(function ($dailySalary) {
+                ->map(function ($dailySalary) use ($outlets) {
                     $employeeName = '';
                     $bankAccountOwner = '';
                     $bankAccountNumber = '';
@@ -1096,9 +1105,12 @@ class DailySalaryController extends Controller
                 })
                 ->sortBy('office_id')
                 ->groupBy('office')
-                ->map(function ($employees, $office) {
+                ->map(function ($employees, $officeName) use ($outlets) {
+                    $officeId = $employees[0]['office_id'] ?? 0;
+                    $cvName = $outlets[$officeId]['cv']['name'] ?? 'CV';
                     return [
-                        'office' => $office,
+                        'cv_name' => $cvName,
+                        'office' => $officeName,
                         'employees' => $employees,
                     ];
                 })
@@ -1136,6 +1148,13 @@ class DailySalaryController extends Controller
                 throw new Error('params "start_date" and "end_date" are required');
             }
 
+            $response = Http::get(env('OPERATIONAL_URL') . '/api/v1/outlets/office-sync');
+
+            $outlets = [];
+            if ($response->successful()) {
+                $outlets = $response->json()['data'];
+            }
+
             $dailySalaries = DailySalary::with(['employee' => function ($q) {
                 $q->with(['activeCareer' => function ($q2) {
                     $q2->with(['jobTitle']);
@@ -1154,10 +1173,12 @@ class DailySalaryController extends Controller
                 })
                 ->groupBy(function ($dailySalary) {
                     return $dailySalary->office_id ?? $dailySalary->employee->office->id ?? 0;
-                })->map(function ($dailySalaries, $officeId) use ($offices, $startDate, $endDate) {
+                })->map(function ($dailySalaries, $officeId) use ($offices, $startDate, $endDate, $outlets) {
+                    $cvName = $outlets[$officeId]['cv']['name'] ?? '-';
                     $totalOutletTakeHomePay = collect($dailySalaries)->sum('take_home_pay');
                     $officeName = collect($offices)->where('id', $officeId)->first()->name ?? '';
                     return [
+                        'cv_name' => $cvName,
                         "depot" => $officeName,
                         'formatted_total' => number_format($totalOutletTakeHomePay, 0, '.', ','),
                         "total" => $totalOutletTakeHomePay,

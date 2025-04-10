@@ -143,6 +143,11 @@ class CredentialGroupController extends Controller
                     'value' => 'overtime_application',
                     'items' => ['view', 'add', 'edit', 'delete'],
                 ],
+                [
+                    'name' => 'Jadwal Kerja',
+                    'value' => 'work_schedule',
+                    'items' => ['view', 'add', 'edit', 'delete'],
+                ],
             ],
         ],
         [

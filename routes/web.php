@@ -59,6 +59,7 @@ use App\Http\Controllers\web\IssueSettlementController;
 use App\Http\Controllers\web\OvertimeApplicationController;
 use App\Http\Controllers\web\OvertimeApplicationV2Controller;
 use App\Http\Controllers\web\PayrollBcaEmailLogController;
+use App\Http\Controllers\web\WorkScheduleController;
 
 /*
 |--------------------------------------------------------------------------
@@ -582,6 +583,21 @@ Route::middleware(['auth'])->group(function () {
     Route::controller(IssueSettlementController::class)->prefix('issue-settlements')->group(function () {
         Route::get('/', 'index');
         Route::post('/', 'store');
+        Route::delete('/{id}', 'destroy');
+    });
+
+    // Work Schedule
+    Route::controller(WorkScheduleController::class)->prefix('work-schedules')->group(function () {
+        Route::get('/', 'index');
+        Route::get('/create', 'create');
+        Route::get('/action/generate-schedule', 'generate');
+        Route::get('/action/generate-schedule-edit', 'generateEditData');
+        Route::get('/export/by-employee', 'exportByEmployee');
+        Route::get('/export/by-office', 'exportByOffice');
+        Route::get('/{id}/detail', 'show');
+        Route::get('/{id}/edit', 'edit');
+        Route::post('/store', 'store');
+        Route::post('/{id}/update', 'update');
         Route::delete('/{id}', 'destroy');
     });
 });

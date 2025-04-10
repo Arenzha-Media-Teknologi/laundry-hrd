@@ -65,7 +65,7 @@ class EmployeeController extends Controller
         $active = request()->query('active') ?? 1;
         $searchKeyword = request()->query('search');
 
-        $permissions = json_decode(Auth::user()->employee->credential->group->permissions ?? "[]", true);
+        $permissions = json_decode(Auth::user()->group->permissions ?? "[]", true);
 
         $isAerplusOnly = false;
         if (in_array('view_employee_aerplus', $permissions)) {
@@ -750,7 +750,7 @@ class EmployeeController extends Controller
         // return $employee->salaryComponents;
 
         $completionCount = collect($employeeCompletion)->count();
-        $completedCount = collect($employeeCompletion)->flatten()->filter(fn ($item) => $item)->count();
+        $completedCount = collect($employeeCompletion)->flatten()->filter(fn($item) => $item)->count();
         $incompleteCount = $completionCount - $completedCount;
         $completionPercentage = round(($completedCount / $completionCount) * 100);
         // return collect($employeeCompletion)->flatten()->all();
@@ -831,7 +831,7 @@ class EmployeeController extends Controller
         // return $employee->salaryComponents;
 
         $completionCount = collect($employeeCompletion)->count();
-        $completedCount = collect($employeeCompletion)->flatten()->filter(fn ($item) => $item)->count();
+        $completedCount = collect($employeeCompletion)->flatten()->filter(fn($item) => $item)->count();
         $incompleteCount = $completionCount - $completedCount;
         $completionPercentage = round(($completedCount / $completionCount) * 100);
         // return collect($employeeCompletion)->flatten()->all();
@@ -1292,7 +1292,7 @@ class EmployeeController extends Controller
                         'salary_component_id' => $salaryComponent->id,
                         'amount' => $salaryAmount,
                         'coefficient' => 2,
-                        'effective_date' => date('Y-m-d'),
+                        'effective_date' => date('Y-01-01'),
                         'created_at' => Carbon::now()->toDateTimeString(),
                         'updated_at' => Carbon::now()->toDateTimeString(),
                     ]);

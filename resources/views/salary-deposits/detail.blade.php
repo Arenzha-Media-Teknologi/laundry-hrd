@@ -407,7 +407,7 @@
                             ],
                         }
 
-                        return axios.post('{{ env("AERPLUS_URL") }}/api/v1/journals', journalPayload)
+                        return axios.post('{{ env("OPERATIONAL_URL") }}/api/v1/journals', journalPayload)
                     })
                     .then(function(response) {
                         let message = response?.data?.message;

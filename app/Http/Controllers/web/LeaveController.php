@@ -21,7 +21,7 @@ class LeaveController extends Controller
     public function index()
     {
         $AERPLUS_DIVISION_ID = 12;
-        $permissions = auth()->user()->employee->credential->group->permissions ?? "[]";
+        $permissions = auth()->user()->group->permissions ?? "[]";
         $permissions = json_decode($permissions);
         $aerplusOnly = in_array('aerplus_only', $permissions);
         $exceptServer = in_array('except_server', $permissions);

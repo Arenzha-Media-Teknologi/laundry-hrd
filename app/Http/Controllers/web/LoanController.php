@@ -343,7 +343,7 @@ class LoanController extends Controller
             // Insert new loan items
             DB::table('loan_items')->insert($dataItems);
 
-            $response = Http::delete(env('AERPLUS_URL') . '/api/v1/journals', [
+            $response = Http::delete(env('OPERATIONAL_URL') . '/api/v1/journals', [
                 'source' => 'MAGENTA_HRD_LOAN',
                 'journalable_id' => $id,
             ]);
@@ -374,7 +374,7 @@ class LoanController extends Controller
             $loan = Loan::findOrFail($id);
             $loan->delete();
 
-            $response = Http::delete(env('AERPLUS_URL') . '/api/v1/journals', [
+            $response = Http::delete(env('OPERATIONAL_URL') . '/api/v1/journals', [
                 'source' => 'MAGENTA_HRD_LOAN',
                 'journalable_id' => $id,
             ]);

@@ -22,7 +22,7 @@ $columnsCount = 12;
         ?>
         @foreach($daily_salaries as $daily_salary)
         <tr style="background-color: grey;">
-            <td colspan="{{ $columnsCount }}">{{ $daily_salary['office'] }}</td>
+            <td colspan="{{ $columnsCount }}">{{ $daily_salary['cv_name'] }} | {{ $daily_salary['office'] }}</td>
         </tr>
         <tr>
             <th>NO</th>

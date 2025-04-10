@@ -132,7 +132,7 @@ class PayrollController extends Controller
         $user = Auth::user();
         $haveStaffPermission = ($user->have_staff_permission ?? 0) == 0 ? false : true;
 
-        $userGroup = auth()->user()->employee->credential->group ?? null;
+        $userGroup = auth()->user()->group ?? null;
         $haveAllCompanyPermissions = $userGroup->have_all_company_permissions ?? false;
         $companyPermissions = json_decode($userGroup->company_permissions ?? "[]");
 
@@ -1014,7 +1014,7 @@ class PayrollController extends Controller
         $user = Auth::user();
         $haveStaffPermission = ($user->have_staff_permission ?? 0) == 0 ? false : true;
 
-        $userGroup = auth()->user()->employee->credential->group ?? null;
+        $userGroup = auth()->user()->group ?? null;
         $haveAllCompanyPermissions = $userGroup->have_all_company_permissions ?? false;
         $companyPermissions = json_decode($userGroup->company_permissions ?? "[]");
 
@@ -2209,7 +2209,7 @@ class PayrollController extends Controller
         $user = Auth::user();
         $haveStaffPermission = ($user->have_staff_permission ?? 0) == 0 ? false : true;
 
-        $userGroup = auth()->user()->employee->credential->group ?? null;
+        $userGroup = auth()->user()->group ?? null;
         $haveAllCompanyPermissions = $userGroup->have_all_company_permissions ?? false;
         $companyPermissions = json_decode($userGroup->company_permissions ?? "[]");
 
