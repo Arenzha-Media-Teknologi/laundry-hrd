@@ -493,14 +493,21 @@ class WorkScheduleController extends Controller
             $employees = Employee::where('active', 1)->orderBy('name', 'ASC')->get()->map(function ($employee) use ($groupedWorkScheduleItems, $periods) {
                 $schedules = collect($periods)->map(function ($date) use ($groupedWorkScheduleItems, $employee) {
                     return $groupedWorkScheduleItems[$employee->id][$date][0] ?? null;
-                });
+                })->all();
 
                 $dailyWage = collect($employee->salaryComponents)->where('salary_type', 'uang_harian')->first()['pivot']['amount'] ?? 0;
 
+                $isHaveSchedules =  collect($schedules)->some(function ($schedule) {
+                    return $schedule != null;
+                });
+
                 $employee->schedules = $schedules;
+                $employee->is_have_schedules = $isHaveSchedules;
                 $employee->daily_wage = $dailyWage;
 
                 return $employee;
+            })->filter(function ($employee) {
+                return $employee->is_have_schedules == true;
             })->all();
 
             // return $employees;
@@ -511,7 +518,7 @@ class WorkScheduleController extends Controller
             $startDate = $workSchedule->start_date;
             $endDate = $workSchedule->end_date;
 
-            return Excel::download(new WorkScheduleByEmployeeExport($employees, $periods, $startDate, $endDate), 'REKAPITULASI JADWAL KERJA PERIODE ' . $startDate . ' - ' . $endDate . '.xlsx');
+            return Excel::download(new WorkScheduleByEmployeeExport($employees, $periods, $startDate, $endDate), 'REKAPITULASI JADWAL KERJA (PEGAWAI) PERIODE ' . $startDate . ' - ' . $endDate . '.xlsx');
         } catch (\Throwable $th) {
             return response()->json([
                 'message' => $th->getMessage(),
@@ -565,7 +572,7 @@ class WorkScheduleController extends Controller
             $startDate = $workSchedule->start_date;
             $endDate = $workSchedule->end_date;
 
-            return Excel::download(new WorkScheduleByOfficeExport($offices, $workScheduleWorkingPatterns, $startDate, $endDate), 'REKAPITULASI JADWAL KERJA PERIODE ' . $startDate . ' - ' . $endDate . '.xlsx');
+            return Excel::download(new WorkScheduleByOfficeExport($offices, $workScheduleWorkingPatterns, $startDate, $endDate), 'REKAPITULASI JADWAL KERJA (OUTLET) PERIODE ' . $startDate . ' - ' . $endDate . '.xlsx');
 
             // return view('work-schedule.export.export-by-office', [
             //     'offices' => $offices,

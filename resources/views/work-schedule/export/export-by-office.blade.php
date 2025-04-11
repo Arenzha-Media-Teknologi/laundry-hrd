@@ -1,6 +1,6 @@
 <table>
     <tr>
-        <td><strong>REKAPITULASI JADWAL KERJA PER DEPOT</strong></td>
+        <td><strong>REKAPITULASI JADWAL KERJA PER OUTLET</strong></td>
     </tr>
     <tr>
         <td><strong>PERIODE {{ \Carbon\Carbon::parse($start_date)->isoFormat('LL') }} - {{ \Carbon\Carbon::parse($end_date)->isoFormat('LL') }}</strong></td>

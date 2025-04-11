@@ -268,6 +268,32 @@
 
 @section('pagescript')
 <script>
+    // window.addEventListener('beforeunload', function(event) {
+    //     // Pesan yang akan ditampilkan
+    //     // const message = 'Apakah Anda yakin ingin meninggalkan halaman ini?';
+
+    //     // // Cara standar (modern browsers)
+    //     // event.preventDefault();
+
+    //     // // Untuk browser yang lebih lama, perlu set returnValue dan mengembalikan pesan
+    //     // event.returnValue = message;
+
+    //     // // Mengembalikan pesan (untuk browser lama)
+    //     // return message;
+    //     if (confirm("Apakah Anda yakin ingin keluar dari halaman ini?")) {
+    //         // window.location.href = "halaman-lain.html";
+    //     }
+    // });
+    window.addEventListener('beforeunload', function(e) {
+        // Pesan ini akan ditampilkan di beberapa browser
+        const confirmationMessage = 'Perubahan yang Anda buat mungkin belum disimpan. Yakin ingin keluar?';
+
+        e.preventDefault(); // Beberapa browser memerlukan ini untuk menampilkan dialog
+        e.returnValue = confirmationMessage; // Untuk kompatibilitas browser lama
+
+        return confirmationMessage; // Untuk browser modern
+    });
+
     moment.locale('id');
     let datatable = null;
     $(function() {
