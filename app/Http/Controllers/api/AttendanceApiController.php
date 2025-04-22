@@ -453,37 +453,62 @@ class AttendanceApiController extends Controller
                 throw new Exception('Pegawai nonaktif tidak dapat melakukan clock in');
             }
 
+            $todayWorkSchedule = WorkScheduleItem::with(['workScheduleWorkingPattern'])->where('employee_id', $employeeId)->where('date', $attendanceDate)->first();
+
             $timeLate = 0;
-
             $workingPatternDay = null;
-            if (isset($workingPatternId) && $workingPatternId !== "") {
-                $activeWorkingPattern = WorkingPattern::with(['items'])->find($workingPatternId);
+            $workScheduleWorkingPatternId = null;
 
-                if ($activeWorkingPattern == null) {
-                    throw new Exception('Pola kerja dengan id ' . $workingPatternId . ' tidak ditemukan');
+            if ($todayWorkSchedule != null) {
+                $isOff = $todayWorkSchedule->is_off;
+                if ($isOff == 1) {
+                    throw new Error('Gagal absen, jadwal kamu OFF hari ini');
                 }
 
-                $attendanceDayOrder = Carbon::parse($attendanceDate)->dayOfWeek;
-                $dayOrder = $attendanceDayOrder < 1 ? 7 : $attendanceDayOrder;
+                $workingPattern = $todayWorkSchedule->workScheduleWorkingPattern;
 
-                $workingPatternDays = collect($activeWorkingPattern->items)->filter(function ($item) use ($dayOrder) {
-                    return $item->order == $dayOrder;
-                })->values()->all();
+                if ($workingPattern != null) {
+                    $calendarHolidays = [];
 
-                if (count($workingPatternDays) < 1) {
-                    throw new Exception('"working pattern day" tidak ditemukan');
+                    $workScheduleWorkingPatternId = $workingPattern->id;
+
+                    if (isset($workingPattern->start_time)) {
+                        if (count($calendarHolidays) < 1) {
+                            $diffMinutes = Carbon::parse($attendanceDate . ' ' . $workingPattern->start_time)->diffInMinutes($attendanceDate . ' ' . $clockInTime, false);
+                            $timeLate = $diffMinutes;
+                        }
+                    }
                 }
+            } else {
+                if (isset($workingPatternId) && $workingPatternId !== "") {
+                    $activeWorkingPattern = WorkingPattern::with(['items'])->find($workingPatternId);
 
-                $workingPatternDay = $workingPatternDays[0] ?? null;
+                    if ($activeWorkingPattern == null) {
+                        throw new Exception('Pola kerja dengan id ' . $workingPatternId . ' tidak ditemukan');
+                    }
+
+                    $attendanceDayOrder = Carbon::parse($attendanceDate)->dayOfWeek;
+                    $dayOrder = $attendanceDayOrder < 1 ? 7 : $attendanceDayOrder;
+
+                    $workingPatternDays = collect($activeWorkingPattern->items)->filter(function ($item) use ($dayOrder) {
+                        return $item->order == $dayOrder;
+                    })->values()->all();
+
+                    if (count($workingPatternDays) < 1) {
+                        throw new Exception('"working pattern day" tidak ditemukan');
+                    }
+
+                    $workingPatternDay = $workingPatternDays[0] ?? null;
 
 
-                $calendarHolidays = [];
+                    $calendarHolidays = [];
 
-                if (isset($workingPatternDay->clock_in)) {
-                    if (count($calendarHolidays) < 1) {
-                        $diffMinutes = Carbon::parse($attendanceDate . ' ' . $workingPatternDay->clock_in)->diffInMinutes($attendanceDate . ' ' . $clockInTime, false);
-                        // $timeLate = Carbon::parse($clockInAt)->diffInMinutes($attendanceDate . ' ' . $workingPatternDay->clock_in);
-                        $timeLate = $diffMinutes;
+                    if (isset($workingPatternDay->clock_in)) {
+                        if (count($calendarHolidays) < 1) {
+                            $diffMinutes = Carbon::parse($attendanceDate . ' ' . $workingPatternDay->clock_in)->diffInMinutes($attendanceDate . ' ' . $clockInTime, false);
+                            // $timeLate = Carbon::parse($clockInAt)->diffInMinutes($attendanceDate . ' ' . $workingPatternDay->clock_in);
+                            $timeLate = $diffMinutes;
+                        }
                     }
                 }
             }
@@ -526,6 +551,7 @@ class AttendanceApiController extends Controller
             $attendance->clock_in_note = $note;
             $attendance->clock_in_attachment = $urlPath;
             $attendance->working_pattern_id = $workingPatternId;
+            $attendance->work_schedule_working_pattern_id = $workScheduleWorkingPatternId;
             $attendance->save();
 
             $quotes = $this->getRandomQuotes();
@@ -1070,63 +1096,86 @@ class AttendanceApiController extends Controller
                 throw new Exception('Pegawai nonaktif tidak dapat melakukan clock out');
             }
 
+            $todayWorkSchedule = WorkScheduleItem::with(['workScheduleWorkingPattern'])->where('employee_id', $employeeId)->where('date', $attendanceDate)->first();
+
             $calendarHolidays = [];
             $earlyLeaving = 0;
             $overtime = 0;
 
-            $workingPatternId = $todayAttendance->working_pattern_id;
-            $workingPatternDay = null;
-            if (isset($workingPatternId) && $workingPatternId !== "") {
-                if ($workingPatternId == null || !isset($todayAttendance->working_pattern_id)) {
-                    throw new Exception('Pola kerja clock in kosong');
+            if ($todayWorkSchedule != null) {
+                $isOff = $todayWorkSchedule->is_off;
+                if ($isOff == 1) {
+                    throw new Error('Gagal absen, jadwal kamu OFF hari ini');
                 }
 
-                if ($isLongShift) {
-                    // if ($longShiftWorkingPatternId == null) {
-                    //     throw new Exception('Clock out long shift membutuhkan properti "long_shift_working_pattern_id"');
-                    // }
+                $workingPattern = $todayWorkSchedule->workScheduleWorkingPattern;
 
-                    // $workingPatternId = $longShiftWorkingPatternId;
-                    $workingPatternId = 6;
-                }
-
-                $activeWorkingPattern = WorkingPattern::with(['items'])->find($workingPatternId);
-
-                if ($activeWorkingPattern == null) {
-                    throw new Exception('Pola kerja dengan id ' . $workingPatternId . ' tidak ditemukan');
-                }
-
-                $attendanceDayOrder = Carbon::parse($attendanceDate)->dayOfWeek;
-                $dayOrder = $attendanceDayOrder < 1 ? 7 : $attendanceDayOrder;
-
-                $workingPatternDays = collect($activeWorkingPattern->items)->filter(function ($item) use ($dayOrder) {
-                    return $item->order == $dayOrder;
-                })->values()->all();
-
-                if (count($workingPatternDays) < 1) {
-                    throw new Exception('"working pattern day" tidak ditemukan');
-                }
-
-                $workingPatternDay = $workingPatternDays[0] ?? null;
-
-
-                // if ($workingPatternDay->clock_out !== null) {
-                //     // function below will return negative value
-                //     // $diffMinutes = Carbon::parse($attendanceDate . ' ' . $clockOutTime)->diffInMinutes($attendanceDate . ' ' . $workingPatternDay->clock_out, false);
-                //     // function below will return positive value
-                //     $diffMinutes = Carbon::parse($attendanceDate . ' ' . $workingPatternDay->clock_out)->diffInMinutes($attendanceDate . ' ' . $clockOutTime, false);
-                //     if (count($calendarHolidays) < 1) {
-                //         $earlyLeaving = $diffMinutes < 0 ? abs($diffMinutes) : 0;
-                //     }
-                //     $overtime = $diffMinutes > 0 ? $diffMinutes : 0;
-                // }
-                if ($workingPatternDay->have_overtime == 1) {
-                    if ($workingPatternDay->overtime_start_time !== null) {
-                        $diffMinutes = Carbon::parse($attendanceDate . ' ' . $workingPatternDay->overtime_start_time)->diffInMinutes($attendanceDate . ' ' . $clockOutTime, false);
-                        if (count($calendarHolidays) < 1) {
-                            $earlyLeaving = $diffMinutes < 0 ? abs($diffMinutes) : 0;
+                if ($workingPattern != null) {
+                    if ($workingPattern->have_overtime == 1) {
+                        if ($workingPattern->overtime_start_time !== null) {
+                            $diffMinutes = Carbon::parse($attendanceDate . ' ' . $workingPattern->overtime_start_time)->diffInMinutes($attendanceDate . ' ' . $clockOutTime, false);
+                            if (count($calendarHolidays) < 1) {
+                                $earlyLeaving = $diffMinutes < 0 ? abs($diffMinutes) : 0;
+                            }
+                            $overtime = $diffMinutes > 0 ? $diffMinutes : 0;
                         }
-                        $overtime = $diffMinutes > 0 ? $diffMinutes : 0;
+                    }
+                }
+            } else {
+                $workingPatternId = $todayAttendance->working_pattern_id;
+                $workingPatternDay = null;
+                if (isset($workingPatternId) && $workingPatternId !== "") {
+                    if ($workingPatternId == null || !isset($todayAttendance->working_pattern_id)) {
+                        throw new Exception('Pola kerja clock in kosong');
+                    }
+
+                    if ($isLongShift) {
+                        // if ($longShiftWorkingPatternId == null) {
+                        //     throw new Exception('Clock out long shift membutuhkan properti "long_shift_working_pattern_id"');
+                        // }
+
+                        // $workingPatternId = $longShiftWorkingPatternId;
+                        $workingPatternId = 6;
+                    }
+
+                    $activeWorkingPattern = WorkingPattern::with(['items'])->find($workingPatternId);
+
+                    if ($activeWorkingPattern == null) {
+                        throw new Exception('Pola kerja dengan id ' . $workingPatternId . ' tidak ditemukan');
+                    }
+
+                    $attendanceDayOrder = Carbon::parse($attendanceDate)->dayOfWeek;
+                    $dayOrder = $attendanceDayOrder < 1 ? 7 : $attendanceDayOrder;
+
+                    $workingPatternDays = collect($activeWorkingPattern->items)->filter(function ($item) use ($dayOrder) {
+                        return $item->order == $dayOrder;
+                    })->values()->all();
+
+                    if (count($workingPatternDays) < 1) {
+                        throw new Exception('"working pattern day" tidak ditemukan');
+                    }
+
+                    $workingPatternDay = $workingPatternDays[0] ?? null;
+
+
+                    // if ($workingPatternDay->clock_out !== null) {
+                    //     // function below will return negative value
+                    //     // $diffMinutes = Carbon::parse($attendanceDate . ' ' . $clockOutTime)->diffInMinutes($attendanceDate . ' ' . $workingPatternDay->clock_out, false);
+                    //     // function below will return positive value
+                    //     $diffMinutes = Carbon::parse($attendanceDate . ' ' . $workingPatternDay->clock_out)->diffInMinutes($attendanceDate . ' ' . $clockOutTime, false);
+                    //     if (count($calendarHolidays) < 1) {
+                    //         $earlyLeaving = $diffMinutes < 0 ? abs($diffMinutes) : 0;
+                    //     }
+                    //     $overtime = $diffMinutes > 0 ? $diffMinutes : 0;
+                    // }
+                    if ($workingPatternDay->have_overtime == 1) {
+                        if ($workingPatternDay->overtime_start_time !== null) {
+                            $diffMinutes = Carbon::parse($attendanceDate . ' ' . $workingPatternDay->overtime_start_time)->diffInMinutes($attendanceDate . ' ' . $clockOutTime, false);
+                            if (count($calendarHolidays) < 1) {
+                                $earlyLeaving = $diffMinutes < 0 ? abs($diffMinutes) : 0;
+                            }
+                            $overtime = $diffMinutes > 0 ? $diffMinutes : 0;
+                        }
                     }
                 }
             }
@@ -1169,6 +1218,7 @@ class AttendanceApiController extends Controller
             $attendance->clock_out_attachment = $urlPath;
             $attendance->early_leaving = $earlyLeaving;
             $attendance->overtime = $overtime;
+            $attendance->overtime_approval_status = 'pending';
             $attendance->is_long_shift = $isLongShift;
             if ($isLongShift) {
                 $attendance->long_shift_status = 'pending';
@@ -1485,7 +1535,7 @@ class AttendanceApiController extends Controller
         } catch (\Throwable $th) {
             return response()->json([
                 'message' => $th->getMessage(),
-            ]);
+            ], 500);
         }
     }
 
@@ -1534,7 +1584,7 @@ class AttendanceApiController extends Controller
         } catch (\Throwable $th) {
             return response()->json([
                 'message' => $th->getMessage(),
-            ]);
+            ], 500);
         }
     }
 
@@ -1583,7 +1633,7 @@ class AttendanceApiController extends Controller
         } catch (\Throwable $th) {
             return response()->json([
                 'message' => $th->getMessage(),
-            ]);
+            ], 500);
         }
     }
 
@@ -1605,7 +1655,7 @@ class AttendanceApiController extends Controller
         } catch (\Throwable $th) {
             return response()->json([
                 'message' => $th->getMessage(),
-            ]);
+            ], 500);
         }
     }
 
@@ -1627,7 +1677,7 @@ class AttendanceApiController extends Controller
         } catch (\Throwable $th) {
             return response()->json([
                 'message' => $th->getMessage(),
-            ]);
+            ], 500);
         }
     }
 
@@ -1644,7 +1694,7 @@ class AttendanceApiController extends Controller
         } catch (\Throwable $th) {
             return response()->json([
                 'message' => $th->getMessage(),
-            ]);
+            ], 500);
         }
     }
 
@@ -1661,7 +1711,7 @@ class AttendanceApiController extends Controller
         } catch (\Throwable $th) {
             return response()->json([
                 'message' => $th->getMessage(),
-            ]);
+            ], 500);
         }
     }
 
@@ -1720,6 +1770,180 @@ class AttendanceApiController extends Controller
             return response()->json([
                 'message' => 'OK',
                 'data' => $timeoffsCount,
+            ]);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'message' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+    // Overtime
+    public function getOvertimes()
+    {
+        // return [
+        //     'asdsd' => 'asdasd',
+        // ];
+        try {
+            $status = request()->query('status');
+            $approverId = request()->query('approver_id');
+            $employeeId = request()->query('employee_id');
+            $startDate = request()->query('start_date');
+            $endDate = request()->query('end_date');
+
+            $overtimeQuery = Attendance::whereHas('employee', function ($q) use ($approverId) {
+                $q->where('overtime_approver_id', $approverId);
+            })->with(['employee' => function ($q) {
+                $q->with(['office']);
+            }])
+                ->where('overtime', '>', 0);
+
+            if (!empty($status)) {
+                $overtimeQuery->where('overtime_approval_status', $status);
+            }
+
+            if (!empty($employeeId)) {
+                $overtimeQuery->where('employee_id', $employeeId);
+            }
+
+            if (!empty($startDate) && !empty($endDate)) {
+                $overtimeQuery->whereBetween('date', [$startDate, $endDate]);
+            }
+
+            $overtimes = $overtimeQuery->simplePaginate(10)->withQueryString();
+
+            return response()->json([
+                'message' => 'OK',
+                'data' => $overtimes,
+            ]);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'message' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function getPendingOvertimesCount()
+    {
+        try {
+            $status = request()->query('status');
+            $approverId = request()->query('approver_id');
+            $employeeId = request()->query('employee_id');
+            $startDate = request()->query('start_date');
+            $endDate = request()->query('end_date');
+
+            // return $status;
+
+            $overtimeQuery = Attendance::whereHas('employee', function ($q) use ($approverId) {
+                $q->where('overtime_approver_id', $approverId);
+            })
+                ->with(['employee' => function ($q) {
+                    $q->with(['office']);
+                }])->where('overtime', '>', 0);
+
+            if (!empty($status)) {
+                $overtimeQuery->where('overtime_approval_status', $status);
+            }
+
+            if (!empty($employeeId)) {
+                $overtimeQuery->where('employee_id', $employeeId);
+            }
+
+            if (!empty($startDate) && !empty($endDate)) {
+                $overtimeQuery->whereBetween('date', [$startDate, $endDate]);
+            }
+
+            $overtimeCount = $overtimeQuery->count();
+
+            return response()->json([
+                'message' => 'OK',
+                'data' => $overtimeCount,
+            ]);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'message' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function approveManyOvertimes(Request $request)
+    {
+        try {
+            $attendanceIds = $request->attendance_ids ?? "[]";
+            $confirmerId = $request->confirmer_id;
+            $attendanceIds = json_decode($attendanceIds);
+            Attendance::query()->whereIn('id', $attendanceIds)->update([
+                'overtime_approval_status' => 'approved',
+                'overtime_confirmed_by' => $confirmerId,
+                'overtime_confirmed_at' => Carbon::now()->toDateTimeString(),
+            ]);
+
+            return response()->json([
+                'message' => 'Pengajuan lembur berhasil disetujui',
+            ]);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'message' => $th->getMessage(),
+            ]);
+        }
+    }
+
+    public function rejectManyOvertimes(Request $request)
+    {
+        try {
+            $attendanceIds = $request->attendance_ids ?? "[]";
+            $confirmerId = $request->confirmer_id;
+            $attendanceIds = json_decode($attendanceIds);
+            Attendance::query()->whereIn('id', $attendanceIds)->update([
+                'overtime_approval_status' => 'rejected',
+                'overtime_confirmed_by' => $confirmerId,
+                'overtime_confirmed_at' => Carbon::now()->toDateTimeString(),
+            ]);
+
+            return response()->json([
+                'message' => 'Perngajuan lembur berhasil ditolak',
+            ]);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'message' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function approveOvertime($id, Request $request)
+    {
+        $confirmerId = $request->confirmer_id;
+
+        try {
+            Attendance::query()->where('id', $id)->update([
+                'overtime_approval_status' => 'approved',
+                'overtime_confirmed_by' => $confirmerId,
+                'overtime_confirmed_at' => Carbon::now()->toDateTimeString(),
+            ]);
+
+            return response()->json([
+                'message' => 'Pengajuan berhasil disetujui',
+            ]);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'message' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function rejectOvertime($id, Request $request)
+    {
+        $confirmerId = $request->confirmer_id;
+
+        try {
+            Attendance::query()->where('id', $id)->update([
+                'overtime_approval_status' => 'rejected',
+                'overtime_confirmed_by' => $confirmerId,
+                'overtime_confirmed_at' => Carbon::now()->toDateTimeString(),
+            ]);
+
+            return response()->json([
+                'message' => 'Pengajuan lembur berhasil ditolak',
             ]);
         } catch (\Throwable $th) {
             return response()->json([

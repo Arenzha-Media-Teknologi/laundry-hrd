@@ -112,7 +112,9 @@ class WorkScheduleController extends Controller
                 'salaryComponents' => function ($q) {
                     $q->orderBy('employee_salary_component.id', 'DESC')->orderBy('employee_salary_component.effective_date', 'DESC');
                 },
-            ])->where('aerplus_daily_salary', 1)->where('active', 1)->get();
+            ])
+                ->where('aerplus_daily_salary', 1)
+                ->where('active', 1)->get();
 
             // return collect($employees[0])->except(['attendances', 'salary_components'])->all();
 

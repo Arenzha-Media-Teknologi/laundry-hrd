@@ -289,11 +289,40 @@
                                         <td class="text-center text-gray-600">@{{ Math.floor((salary?.attendance?.overtime || 0) / 60) }}</td>
                                         <td class="text-center text-gray-600">@{{ salary.attendance.is_long_shift == 1 ? 'Ya' : '' }}</td>
                                         <td class="text-center text-gray-600">@{{ salary.attendance.time_late }}</td>
-                                        <td class="text-end text-gray-700">@{{ currencyFormat(salary.daily_wage) }}</td>
-                                        <td class="text-end text-gray-700">@{{ currencyFormat(salary.overtime_pay) }}</td>
+                                        <!-- <td class="text-end text-gray-700">@{{ currencyFormat(salary.daily_wage) }}</td> -->
+                                        <td class="text-end text-gray-700">
+                                            <div v-if="salary.editing_daily_wage">
+                                                <div class="input-group input-group-sm mb-5">
+                                                    <span class="input-group-text" id="basic-addon1">Rp</span>
+                                                    <input type="text" v-model="salary.daily_wage" class="form-control text-end" @blur="onBlurDailyWage(salary)" @input="onInputDailyWage(salary)">
+                                                </div>
+                                            </div>
+                                            <div v-else>
+                                                <span @click="onClickDailyWage(salary)">@{{ currencyFormat(salary.daily_wage) }}</span>
+                                            </div>
+                                        </td>
+                                        <td class="text-end text-gray-700">
+                                            <div v-if="salary.editing_overtime_pay">
+                                                <div class="input-group input-group-sm mb-5">
+                                                    <span class="input-group-text" id="basic-addon1">Rp</span>
+                                                    <input type="text" v-model="salary.overtime_pay" class="form-control text-end" @blur="onBlurOvertimePay(salary)" @input="onInputOvertimePay(salary)">
+                                                </div>
+                                            </div>
+                                            <div v-else>
+                                                <span @click="onClickOvertimePay(salary)">@{{ currencyFormat(salary.overtime_pay) }}</span>
+                                            </div>
+                                        </td>
                                         <td class="text-end text-gray-700 pe-2">@{{ currencyFormat(salary.total) }}</td>
                                     </tr>
                                 </tbody>
+                                <tfoot class="bg-light-success">
+                                    <tr>
+                                        <td colspan="9"></td>
+                                        <td class="text-end fw-bold fs-5 text-gray-800">@{{ currencyFormat(totalDailyWage) }}</td>
+                                        <td class="text-end fw-bold fs-5 text-gray-800">@{{ currencyFormat(totalOvertimePay) }}</td>
+                                        <td class="text-end fw-bolder fs-4 text-gray-800 pe-2">@{{ currencyFormat(totalIncomes) }}</td>
+                                    </tr>
+                                </tfoot>
                                 <!-- <tfoot>
                                     <tr>
                                         <td colspan="9"></td>
@@ -306,10 +335,10 @@
                             <div class="col-md-6 col-lg-4">
                                 <table class="table">
                                     <tbody class="fs-5 fw-bold bg-light-success">
-                                        <tr>
+                                        <!-- <tr>
                                             <td class="ps-2 fw-normal">Total Harian</td>
                                             <td class="text-end pe-2">Rp @{{ currencyFormat(selectedDetailSalary?.total_periods) }}</td>
-                                        </tr>
+                                        </tr> -->
                                         <tr v-for="additionalIncome in selectedDetailSalary?.additional_incomes">
                                             <td class="ps-2 fw-normal">@{{ additionalIncome?.name }}</td>
                                             <td class="text-end pe-2">Rp @{{ currencyFormat(additionalIncome?.amount || 0) }}</td>
@@ -645,17 +674,31 @@
                 }
                 return null;
             },
+            totalDailyWage() {
+                const self = this;
+                const total = self.selectedDetailSalary.periods.map(period => Number(period.daily_wage)).reduce((acc, cur) => acc + cur, 0);
+                return total;
+            },
+            totalOvertimePay() {
+                const self = this;
+                const total = self.selectedDetailSalary.periods.map(period => Number(period.overtime_pay)).reduce((acc, cur) => acc + cur, 0);
+                return total;
+            },
+            totalIncomes() {
+                return this.totalDailyWage + this.totalOvertimePay;
+            },
             totalOtherDeductions() {
                 const self = this;
                 const total = self.selectedDetailSalary.other_deductions.map(deduction => Number(deduction.amount)).reduce((acc, cur) => acc + cur, 0);
                 return total;
             },
-            totalOvertimePay() {},
-            totalIncomes() {
-                return this.selectedDetailSalary?.summary?.total_incomes || 0;
-            },
             totalDeductions() {
-                return this.totalOtherDeductions + (this.selectedDetailSalary?.total_loan ?? 0);
+                // return this.selectedDetailSalary?.summary?.total_deductions || 0;
+                const totalLoan = this.selectedDetailSalary?.total_loan || 0;
+                const totalOtherDeductions = this.totalOtherDeductions;
+                const total = totalLoan + totalOtherDeductions;
+
+                return total;
             },
             takeHomePay() {
                 return this.totalIncomes - this.totalDeductions;
@@ -665,22 +708,6 @@
             }
         },
         methods: {
-            openDetailModal(employeeId) {
-                // this.tempSalaries = this.salaries.map(salary => salary);
-                this.tempSalaries = JSON.parse(JSON.stringify(this.salaries));
-                this.selectedDetailEmployeeId = employeeId;
-            },
-            onDismissDetailModal() {
-                console.log('on dismiss');
-                this.salaries = this.tempSalaries;
-            },
-            onSaveDetailModal() {
-                this.selectedDetailSalary.summary.total_incomes = this.totalIncomes;
-                this.selectedDetailSalary.summary.total_deductions = this.selectedDetailSalary.summary.total_deductions + this.totalOtherDeductions;
-                this.selectedDetailSalary.summary.take_home_pay = this.selectedDetailSalary.summary.total_incomes - this.selectedDetailSalary.summary.total_deductions;
-                // this.totalTakeHomePay += this.takeHomePay;
-                closeModal('#detail_modal');
-            },
             addOtherDeduction() {
                 return this.selectedDetailSalary.other_deductions.push({
                     type: '',
@@ -887,9 +914,11 @@
             currencyFormat(number) {
                 return new Intl.NumberFormat('De-de').format(number);
             },
-            // openDetailModal(employeeId) {
-            //     this.selectedDetailEmployeeId = employeeId;
-            // },
+            openDetailModal(employeeId) {
+                // this.tempSalaries = this.salaries.map(salary => salary);
+                this.tempSalaries = JSON.parse(JSON.stringify(this.salaries));
+                this.selectedDetailEmployeeId = employeeId;
+            },
             badgeColor(status) {
                 const prefix = 'badge badge-';
                 switch (status) {
@@ -904,6 +933,44 @@
                     default:
                         return '';
                 }
+            },
+            onClickDailyWage(salary) {
+                // const {
+                //     selectedDetailEmployeeId,
+                //     salaries
+                // } = this;
+                // if (selectedDetailEmployeeId && salaries.length) {
+                //     const salaryIndex = salaries.findIndex(salary => salary.employee.id == selectedDetailEmployeeId);
+
+                //     this.salaries[salaryIndex].periods[index].editing_daily_wage = true;
+                // }
+                salary.editing_daily_wage = true;
+            },
+            onBlurDailyWage(salary) {
+                salary.editing_daily_wage = false;
+            },
+            onInputDailyWage(salary) {
+                salary.total = Number(salary.daily_wage) + Number(salary.overtime_pay);
+            },
+            onClickOvertimePay(salary) {
+                salary.editing_overtime_pay = true;
+            },
+            onBlurOvertimePay(salary) {
+                salary.editing_overtime_pay = false;
+            },
+            onInputOvertimePay(salary) {
+                salary.total = Number(salary.daily_wage) + Number(salary.overtime_pay);
+            },
+            onDismissDetailModal() {
+                console.log('on dismiss');
+                this.salaries = this.tempSalaries;
+            },
+            onSaveDetailModal() {
+                this.selectedDetailSalary.summary.total_incomes = this.totalIncomes;
+                this.selectedDetailSalary.summary.total_deductions = this.totalDeductions;
+                this.selectedDetailSalary.summary.take_home_pay = this.takeHomePay;
+                // this.totalTakeHomePay += this.takeHomePay;
+                closeModal('#detail_modal');
             }
         },
         watch: {
@@ -930,11 +997,9 @@
             },
             'selectedDetailSalary.selected_loan_id': function(newValue, oldValue) {
                 const self = this;
-                if (this.selectedDetailSalary) {
-                    // this.onChangeIncludeLoan(this.selectedDetailSalary, oldValue);
-                    // console.log('changed', newValue);
-                    // console.log(this.selectedDetailSalary);
-                };
+                // if (this.selectedDetailSalary) {
+                //     this.onChangeIncludeLoan(this.selectedDetailSalary, oldValue);
+                // };
             }
         }
     })

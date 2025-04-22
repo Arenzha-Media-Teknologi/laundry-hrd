@@ -2172,7 +2172,7 @@ class PayrollController extends Controller
     public function generateDailyAerplus()
     {
         $companies = Company::all();
-        return view('payrolls.daily.generate-aerplus', [
+        return view('payrolls.daily.generate-aerplus-v2', [
             'companies' => $companies,
         ]);
     }

@@ -13,6 +13,10 @@ class AnnouncementApiController extends Controller
     public function getAll()
     {
         try {
+            return response()->json([
+                'data' => []
+            ]);
+
             $companies = Company::all();
             $companyId = request()->query('company_id');
             $announcements = Announcement::with(['createdByEmployee'])

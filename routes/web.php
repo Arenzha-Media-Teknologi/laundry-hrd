@@ -60,6 +60,7 @@ use App\Http\Controllers\web\OvertimeApplicationController;
 use App\Http\Controllers\web\OvertimeApplicationV2Controller;
 use App\Http\Controllers\web\PayrollBcaEmailLogController;
 use App\Http\Controllers\web\WorkScheduleController;
+use App\Http\Controllers\web\WorkScheduleWorkingPatternController;
 
 /*
 |--------------------------------------------------------------------------
@@ -410,6 +411,14 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/', 'index');
         // Route::get('/create', 'create');
         // Route::get('/{id}/edit', 'edit');
+        Route::post('/', 'store');
+        Route::post('/{id}', 'update');
+        Route::delete('/{id}', 'destroy');
+    });
+
+    // Work Schedule Working Pattern
+    Route::controller(WorkScheduleWorkingPatternController::class)->prefix('work-schedule-working-patterns')->group(function () {
+        Route::get('/', 'index');
         Route::post('/', 'store');
         Route::post('/{id}', 'update');
         Route::delete('/{id}', 'destroy');

@@ -546,8 +546,9 @@ $permissions = json_decode($groupPermissions);
                 $isEventCalendarRoute = request()->is('event-calendars*');
                 $isLeaveCategoriesRoute = request()->is('leave-categories*');
                 $isGroupRoute = request()->is('credential-groups*');
-                $isSettingAttendanceRoute = request()->is('setting/attendance*');
-                $isSettingRouteGroup = $isEventCalendarRoute || $isLeaveCategoriesRoute || $isGroupRoute || $isSettingAttendanceRoute;
+                $isSettingAttendanceRoute = request()->is('settings/attendance*');
+                $isWorkScheduleWorkingPatternRoute = request()->is('work-schedule-working-patterns');
+                $isSettingRouteGroup = $isEventCalendarRoute || $isLeaveCategoriesRoute || $isGroupRoute || $isSettingAttendanceRoute || $isWorkScheduleWorkingPatternRoute;
 
                 $hasSettingGroupPermission = auth()->user()->can('view', App\Models\EventCalendar::class) || auth()->user()->can('view', App\Models\LeaveCategory::class) || auth()->user()->can('view', App\Models\CredentialGroup::class);
                 ?>
@@ -596,6 +597,14 @@ $permissions = json_decode($groupPermissions);
                             </a>
                         </div>
                         @endcan
+                        <div class="menu-item">
+                            <a class="menu-link <?= $isWorkScheduleWorkingPatternRoute ? 'active' : '' ?>" href="/work-schedule-working-patterns">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Shift Jadwal Kerja</span>
+                            </a>
+                        </div>
                         @can('view', App\Models\CredentialGroup::class)
                         <div class="menu-item">
                             <a class="menu-link <?= $isGroupRoute ? 'active' : '' ?>" href="/credential-groups">

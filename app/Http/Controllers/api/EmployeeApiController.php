@@ -327,6 +327,10 @@ class EmployeeApiController extends Controller
             // 4, 193
             // 4, 192
 
+            $isOvertimeApprover = Employee::where('active', 1)->where('overtime_approver_id', $employee->id)->count() > 0;
+
+            $employee->is_overtime_approver = $isOvertimeApprover;
+
 
             return response()->json([
                 'message' => 'OK',

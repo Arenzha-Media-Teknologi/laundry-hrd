@@ -679,8 +679,11 @@ class DailySalaryController extends Controller
                         'date' => $date,
                         'day_name' => Carbon::parse($date)->locale('id')->dayName,
                         // 'attendance' => $newestAttendance,
+                        'editing_daily_wage' => false,
                         'daily_wage' => $dailyWage,
+                        // 'new_daily_wage' => $dailyWage,
                         'overtime_pay' => round($overtimePay),
+                        'editing_overtime_pay' => false,
                         'total' => $dailyWage + round($overtimePay),
                         'attendance' => $attendance,
                     ];
@@ -755,6 +758,8 @@ class DailySalaryController extends Controller
                     return $loan->items;
                 })->all();
 
+                $otherDeductions = [];
+
                 return [
                     'employee' => collect($employee)->except('attendances')->all(),
                     'periods' => $periods,
@@ -778,6 +783,7 @@ class DailySalaryController extends Controller
                     'list_unpaid_deposits' => $unpaidDeposit->values()->all(),
                     'list_unredeemed_deposits' => $unredeemedDeposit->values()->all(),
                     'list_loans' => $loanItems->values()->all(),
+                    'other_deductions' => $otherDeductions,
                     'summary' => [
                         'total_incomes' => $totalIncomes,
                         'total_deductions' => $totalDeductions,
@@ -917,6 +923,15 @@ class DailySalaryController extends Controller
                         'name' => 'Denda keterlambatan ' . $salary['total_time_late'] . ' Menit',
                         'type' => 'late_fee',
                         'value' => $salary['late_charge'],
+                    ]);
+                }
+
+                $otherDeductions = $salary['other_deductions'] ?? [];
+                foreach ($otherDeductions as $otherDeduction) {
+                    array_push($deductions, [
+                        'name' => 'Denda',
+                        'type' => $otherDeduction['type'] ?? '',
+                        'value' => $otherDeduction['amount'] ?? 0,
                     ]);
                 }
 

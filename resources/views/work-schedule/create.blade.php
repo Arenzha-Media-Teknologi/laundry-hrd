@@ -50,6 +50,9 @@
                         <ul v-cloak class="list-group">
                             <li v-for="workScheduleWorkingPattern in workScheduleWorkingPatterns" class="list-group-item d-flex justify-content-between align-items-center"><span class="badge badge-sm" :style="`background-color: ${workScheduleWorkingPattern.color};`">@{{ workScheduleWorkingPattern.name }}</span> <span>@{{ workScheduleWorkingPattern.start_time }} - @{{ workScheduleWorkingPattern.end_time }}</span></li>
                         </ul>
+                        <div class="mt-1">
+                            <a href="/work-schedule-working-patterns" class="btn btn-light-primary w-100"><i class="bi bi-gear"></i> Atur Shift</a>
+                        </div>
                     </div>
                 </div>
                 <div class="col-sm-4">

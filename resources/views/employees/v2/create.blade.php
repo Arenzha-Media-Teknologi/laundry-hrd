@@ -4,6 +4,11 @@
 
 @section('head')
 <link href="{{ asset('assets/plugins/custom/datatables/datatables.bundle.css') }}" rel="stylesheet" type="text/css" />
+<style>
+    .select2-container--bootstrap5 .select2-selection--single .select2-selection__rendered {
+        color: rgb(26, 26, 26);
+    }
+</style>
 @endsection
 
 @section('content')
@@ -611,6 +616,39 @@
                 <!--end::Card header-->
             </div>
 
+            <!--begin::Contact options-->
+            <div class="card card-flush py-4">
+                <!--begin::Card header-->
+                <div class="card-header">
+                    <div class="card-title d-block">
+                        <h2>Approver Pengajuan</h2>
+                        <div>
+                            <small>Pilih pegawai yang mengkonfirmasi pengajuan</small>
+                        </div>
+                    </div>
+                </div>
+                <!--end::Card header-->
+                <!--begin::Card body-->
+                <div class="card-body pt-0">
+                    <div>
+                        <div class="row align-items-center">
+                            <div class="col-md-2">
+                                <label class="form-label fs-7">Lembur:</label>
+                            </div>
+                            <div class="col-md-6">
+                                <select class="form-select form-select-sm" id="select-overtime-approver">
+                                    <option value="">Pilih Pegawai</option>
+                                    @foreach($employees as $employee)
+                                    <option value="{{ $employee->id }}">{{ $employee->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!--end::Card header-->
+            </div>
+
             <div class="card card-flush py-4">
                 <!--begin::Card header-->
                 <div class="card-header">
@@ -923,6 +961,7 @@
                     driversLicenses: [],
                     insuranceType: '',
                     insurances: [],
+                    overtimeApprover: '',
                 },
                 submitLoading: false,
             }
@@ -1056,6 +1095,7 @@
                         salary,
                         driversLicenses,
                         insurances,
+                        overtimeApprover,
                     } = self.model;
 
                     const [employeeNumber] = self.employeeNumber;
@@ -1107,6 +1147,7 @@
                         photo,
                         drivers_licenses: driversLicenses,
                         insurances,
+                        overtime_approver_id: overtimeApprover,
                     };
 
                     const formData = new FormData();
@@ -1404,6 +1445,12 @@
         imageInput.on("kt.imageinput.removed", function() {
             console.log("kt.imageinput.removed event is fired");
         });
+
+        $('#select-overtime-approver').select2();
+        $('#select-overtime-approver').on('change', function() {
+            const value = $(this).val();
+            app.$data.model.overtimeApprover = value;
+        })
     })
 </script>
 @endsection

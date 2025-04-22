@@ -31,138 +31,144 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-  return $request->user();
+    return $request->user();
 });
 
 // Global Routes
 Route::controller(GlobalApiController::class)->prefix('global')->group(function () {
-  Route::get('/create-employee-resources', 'createEmployeeResources');
-  Route::get('/firebase-test', 'firebaseTest');
+    Route::get('/create-employee-resources', 'createEmployeeResources');
+    Route::get('/firebase-test', 'firebaseTest');
 });
 
 // Employee
 Route::controller(EmployeeApiController::class)->prefix('employees')->group(function () {
-  Route::get('/', 'index');
-  Route::get('/aerplus-bonus-salary', 'aerplusBonusSalaryEmployees');
-  Route::get('/birthdays', 'birthdays');
-  Route::get('/birthdays-count', 'birthdaysCount');
-  Route::get('/{id}', 'show');
-  Route::get('/{id}/loans', 'loans');
-  Route::get('/{id}/attendances', 'attendances');
-  Route::get('/{id}/activities', 'activities');
-  Route::get('/{id}/checkins', 'checkIns');
-  Route::get('/{id}/attendance-summary', 'attendanceSummary');
-  Route::get('/{id}/monthly-attendances', 'monthlyAttendances');
-  Route::get('/{id}/sick-applications', 'sickApplications');
-  Route::get('/{id}/leave-applications', 'leaveApplications');
-  Route::get('/{id}/remaining-leaves', 'getRemainingLeaves');
-  Route::get('/{id}/active-leaves', 'getActiveLeave');
-  Route::get('/{id}/payslips', 'payslips');
-  Route::get('/{id}/remaining-leaves', 'remainingLeaves');
-  Route::get('/{id}/insights', 'insights');
-  Route::get('/detail-v2/{id}', 'showV2');
-  Route::patch('/{id}/change-password', 'changePassword');
-  Route::patch('/{id}/edit-account', 'editAccount');
+    Route::get('/', 'index');
+    Route::get('/aerplus-bonus-salary', 'aerplusBonusSalaryEmployees');
+    Route::get('/birthdays', 'birthdays');
+    Route::get('/birthdays-count', 'birthdaysCount');
+    Route::get('/{id}', 'show');
+    Route::get('/{id}/loans', 'loans');
+    Route::get('/{id}/attendances', 'attendances');
+    Route::get('/{id}/activities', 'activities');
+    Route::get('/{id}/checkins', 'checkIns');
+    Route::get('/{id}/attendance-summary', 'attendanceSummary');
+    Route::get('/{id}/monthly-attendances', 'monthlyAttendances');
+    Route::get('/{id}/sick-applications', 'sickApplications');
+    Route::get('/{id}/leave-applications', 'leaveApplications');
+    Route::get('/{id}/remaining-leaves', 'getRemainingLeaves');
+    Route::get('/{id}/active-leaves', 'getActiveLeave');
+    Route::get('/{id}/payslips', 'payslips');
+    Route::get('/{id}/remaining-leaves', 'remainingLeaves');
+    Route::get('/{id}/insights', 'insights');
+    Route::get('/detail-v2/{id}', 'showV2');
+    Route::patch('/{id}/change-password', 'changePassword');
+    Route::patch('/{id}/edit-account', 'editAccount');
 });
 
 // Attendances
 Route::controller(AttendanceApiController::class)->prefix('attendances')->group(function () {
-  Route::get('/', 'index');
-  Route::get('/time-offs', 'getTimeOffs');
-  Route::get('/time-offs-count', 'getTimeOffsCount');
-  Route::get('/long-shifts', 'getLongShifts');
-  Route::get('/long-shifts-v2', 'getLongShiftsV2');
-  Route::get('/long-shifts-count', 'getPendingLongShiftsCount');
-  Route::get('/{id}', 'show');
-  Route::post('/action/clockin', 'clockIn');
-  Route::post('/action/clockin-v2', 'clockInV2');
-  Route::post('/action/clockin-v3', 'clockInV3');
-  Route::post('/action/clockout', 'clockOut');
-  Route::post('/action/clockout-v2', 'clockOutV2');
-  Route::post('/action/clockout-v3', 'clockOutV3');
-  Route::post('/long-shifts/approve-many', 'approveManyLongShift');
-  Route::post('/long-shifts/reject-many', 'rejectManyLongShift');
-  Route::post('/long-shifts/{id}/approve', 'approveLongShift');
-  Route::post('/long-shifts/{id}/reject', 'rejectLongShift');
+    Route::get('/', 'index');
+    Route::get('/time-offs', 'getTimeOffs');
+    Route::get('/time-offs-count', 'getTimeOffsCount');
+    Route::get('/long-shifts', 'getLongShifts');
+    Route::get('/long-shifts-v2', 'getLongShiftsV2');
+    Route::get('/long-shifts-count', 'getPendingLongShiftsCount');
+    Route::get('/overtimes', 'getOvertimes');
+    Route::get('/overtimes-count', 'getPendingOvertimesCount');
+    Route::get('/{id}', 'show');
+    Route::post('/action/clockin', 'clockIn');
+    Route::post('/action/clockin-v2', 'clockInV2');
+    Route::post('/action/clockin-v3', 'clockInV3');
+    Route::post('/action/clockout', 'clockOut');
+    Route::post('/action/clockout-v2', 'clockOutV2');
+    Route::post('/action/clockout-v3', 'clockOutV3');
+    Route::post('/long-shifts/approve-many', 'approveManyLongShift');
+    Route::post('/long-shifts/reject-many', 'rejectManyLongShift');
+    Route::post('/long-shifts/{id}/approve', 'approveLongShift');
+    Route::post('/long-shifts/{id}/reject', 'rejectLongShift');
+    Route::post('/overtimes/approve-many', 'approveManyOvertimes');
+    Route::post('/overtimes/reject-many', 'rejectManyOvertimes');
+    Route::post('/overtimes/{id}/approve', 'approveOvertimes');
+    Route::post('/overtimes/{id}/reject', 'rejectOvertimes');
 });
 
 // Sick Application
 Route::controller(SickApplicationApiController::class)->prefix('sick-applications')->group(function () {
-  Route::get('/{id}', 'show');
-  Route::post('/', 'store');
-  Route::post('/store-base64', 'storeBase64');
-  Route::post('/store-test', 'storeTest');
-  Route::post('/{id}', 'update');
-  Route::post('/{id}/approve', 'approve');
-  Route::post('/{id}/reject', 'reject');
-  Route::delete('/{id}', 'destroy');
+    Route::get('/{id}', 'show');
+    Route::post('/', 'store');
+    Route::post('/store-base64', 'storeBase64');
+    Route::post('/store-test', 'storeTest');
+    Route::post('/{id}', 'update');
+    Route::post('/{id}/approve', 'approve');
+    Route::post('/{id}/reject', 'reject');
+    Route::delete('/{id}', 'destroy');
 });
 
 // Sick Application
 Route::controller(LeaveApplicationApiController::class)->prefix('leave-applications')->group(function () {
-  Route::get('/{id}', 'show');
-  Route::post('/', 'store');
-  Route::post('/{id}', 'update');
-  Route::post('/{id}/approve', 'approve');
-  Route::post('/{id}/reject', 'reject');
-  Route::delete('/{id}', 'destroy');
+    Route::get('/{id}', 'show');
+    Route::post('/', 'store');
+    Route::post('/{id}', 'update');
+    Route::post('/{id}/approve', 'approve');
+    Route::post('/{id}/reject', 'reject');
+    Route::delete('/{id}', 'destroy');
 });
 
 // Permission Application
 Route::controller(PermissionApplicationApiController::class)->prefix('permission-applications')->group(function () {
-  Route::post('/', 'store');
-  Route::post('/{id}', 'update');
-  Route::post('/{id}/approve', 'approve');
-  Route::post('/{id}/reject', 'reject');
+    Route::post('/', 'store');
+    Route::post('/{id}', 'update');
+    Route::post('/{id}/approve', 'approve');
+    Route::post('/{id}/reject', 'reject');
 });
 
 // Permission Application
 Route::controller(AuthApiController::class)->prefix('auth')->group(function () {
-  Route::post('/mobile/employee', 'loginEmployee');
-  Route::post('/mobile/admin', 'loginAdmin');
-  Route::post('/web/dashboard-employee', 'loginDashboardEmployee');
+    Route::post('/mobile/employee', 'loginEmployee');
+    Route::post('/mobile/admin', 'loginAdmin');
+    Route::post('/web/dashboard-employee', 'loginDashboardEmployee');
 });
 
 // Leave Categories
 Route::controller(LeaveCategoryApiController::class)->prefix('leave-categories')->group(function () {
-  Route::get('/', 'index');
+    Route::get('/', 'index');
 });
 
 // Working Patterns
 Route::controller(WorkingPatternApiController::class)->prefix('working-patterns')->group(function () {
-  Route::get('/', 'index');
+    Route::get('/', 'index');
 });
 
 // Ispections
 Route::controller(InspectionApiController::class)->prefix('inspections')->group(function () {
-  Route::get('/', 'getAll');
-  Route::post('/', 'store');
-  Route::delete('/{id}', 'destroy');
+    Route::get('/', 'getAll');
+    Route::post('/', 'store');
+    Route::delete('/{id}', 'destroy');
 });
 
 // Office
 Route::controller(OfficeApiController::class)->prefix('offices')->group(function () {
-  Route::get('/', 'getAll');
+    Route::get('/', 'getAll');
 });
 
 // Announcement
 Route::controller(AnnouncementApiController::class)->prefix('announcements')->group(function () {
-  Route::get('/', 'getAll');
+    Route::get('/', 'getAll');
 });
 
 // Check In
 Route::controller(CheckInApiController::class)->prefix('checkins')->group(function () {
-  Route::get('/', 'getAll');
-  Route::get('/{id}', 'show');
-  Route::post('/checkin', 'checkIn');
+    Route::get('/', 'getAll');
+    Route::get('/{id}', 'show');
+    Route::post('/checkin', 'checkIn');
 });
 
 // Activity
 Route::controller(ActivityApiController::class)->prefix('activities')->group(function () {
-  Route::get('/current-state', 'getCurrentState');
-  Route::get('/active-activity', 'getActiveActivity');
-  Route::post('/check-in', 'checkIn');
-  Route::post('/check-out', 'checkOut');
+    Route::get('/current-state', 'getCurrentState');
+    Route::get('/active-activity', 'getActiveActivity');
+    Route::post('/check-in', 'checkIn');
+    Route::post('/check-out', 'checkOut');
 });
 
 

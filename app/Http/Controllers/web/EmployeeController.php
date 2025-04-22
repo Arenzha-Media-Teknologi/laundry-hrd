@@ -235,6 +235,7 @@ class EmployeeController extends Controller
         $designations = Designation::all();
         $jobTitles = JobTitle::all();
         $privateInsurances = PrivateInsurance::all();
+        $employees = Employee::where('active', 1)->get();
 
         return view('employees.v2.create', [
             'companies' => $companies,
@@ -244,6 +245,7 @@ class EmployeeController extends Controller
             'designations' => $designations,
             'jobTitles' => $jobTitles,
             'private_insurances' => $privateInsurances,
+            'employees' => $employees,
         ]);
     }
 
@@ -1000,6 +1002,8 @@ class EmployeeController extends Controller
 
         $oldEmployeeNumber = $employee?->office?->division?->company?->initial . '-' . $employee?->office?->division?->initial . '-' . $employee->number;
 
+        $employees = Employee::where('active', 1)->get();
+
         return view('employees._id.v2.edit', [
             'employee' => $employee,
             'old_employee_number' => $oldEmployeeNumber,
@@ -1013,6 +1017,7 @@ class EmployeeController extends Controller
             'salary_values' => $employeeSalaryValues,
             'drivers_licenses' => $employeeDriversLicenses,
             'employee_insurances' => $insurances,
+            'employees' => $employees,
         ]);
     }
 

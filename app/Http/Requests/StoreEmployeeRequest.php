@@ -87,6 +87,7 @@ class StoreEmployeeRequest extends FormRequest
             'npwp_status' => 'nullable',
             'magenta_daily_salary' => 'nullable',
             'aerplus_daily_salary' => 'nullable',
+            'overtime_approver_id' => 'nullable',
             'image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
         ];
     }
