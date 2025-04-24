@@ -562,7 +562,7 @@ class AttendanceApiController extends Controller
                 'data' => $attendance,
                 'code' => 200,
             ]);
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             return response()->json([
                 'message' => $e->getMessage(),
                 'code' => 500,
@@ -1240,7 +1240,7 @@ class AttendanceApiController extends Controller
                 'data' => $attendance,
                 'code' => 200,
             ]);
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             return response()->json([
                 'message' => $e->getMessage(),
                 'code' => 500,
