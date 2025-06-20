@@ -12,6 +12,8 @@ use App\Http\Controllers\api\LeaveApplicationApiController;
 use App\Http\Controllers\api\LeaveCategoryApiController;
 use App\Http\Controllers\api\OfficeApiController;
 use App\Http\Controllers\api\PermissionApplicationApiController;
+use App\Http\Controllers\api\PermissionCategoryApiController;
+use App\Http\Controllers\api\PermissionNoteApiController;
 use App\Http\Controllers\api\SickApplicationApiController;
 use App\Http\Controllers\api\WorkingPatternApiController;
 use App\Http\Controllers\web\LeaveCategoryController;
@@ -60,6 +62,7 @@ Route::controller(EmployeeApiController::class)->prefix('employees')->group(func
     Route::get('/{id}/payslips', 'payslips');
     Route::get('/{id}/remaining-leaves', 'remainingLeaves');
     Route::get('/{id}/insights', 'insights');
+    Route::get('/{id}/monthly-work-schedules', 'monthlyWorkSchedules');
     Route::get('/detail-v2/{id}', 'showV2');
     Route::patch('/{id}/change-password', 'changePassword');
     Route::patch('/{id}/edit-account', 'editAccount');
@@ -73,6 +76,8 @@ Route::controller(AttendanceApiController::class)->prefix('attendances')->group(
     Route::get('/long-shifts', 'getLongShifts');
     Route::get('/long-shifts-v2', 'getLongShiftsV2');
     Route::get('/long-shifts-count', 'getPendingLongShiftsCount');
+    Route::get('/permissions', 'getPermissions');
+    Route::get('/permissions-count', 'getPendingPermissionsCount');
     Route::get('/overtimes', 'getOvertimes');
     Route::get('/overtimes-count', 'getPendingOvertimesCount');
     Route::get('/{id}', 'show');
@@ -90,6 +95,10 @@ Route::controller(AttendanceApiController::class)->prefix('attendances')->group(
     Route::post('/overtimes/reject-many', 'rejectManyOvertimes');
     Route::post('/overtimes/{id}/approve', 'approveOvertimes');
     Route::post('/overtimes/{id}/reject', 'rejectOvertimes');
+    Route::post('/permissions/approve-many', 'approveManyPermission');
+    Route::post('/permissions/reject-many', 'rejectManyPermission');
+    Route::post('/permissions/{id}/approve', 'approvePermission');
+    Route::post('/permissions/{id}/reject', 'rejectPermission');
 });
 
 // Sick Application
@@ -155,6 +164,17 @@ Route::controller(OfficeApiController::class)->prefix('offices')->group(function
 Route::controller(AnnouncementApiController::class)->prefix('announcements')->group(function () {
     Route::get('/', 'getAll');
 });
+
+// Permission Categories
+Route::controller(PermissionCategoryApiController::class)->prefix('permission-categories')->group(function () {
+    Route::get('/', 'getAll');
+});
+
+// Permission Notes
+Route::controller(PermissionNoteApiController::class)->prefix('permission-notes')->group(function () {
+    Route::get('/', 'getAll');
+});
+
 
 // Check In
 Route::controller(CheckInApiController::class)->prefix('checkins')->group(function () {

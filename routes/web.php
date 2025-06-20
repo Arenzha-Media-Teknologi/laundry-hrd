@@ -288,6 +288,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/daily-aerplus', 'indexDailyAerplus');
         Route::get('/daily-aerplus/generate', 'generateDailyAerplus');
         Route::get('/daily-aerplus/show-by-period', 'showByPeriodDailyAerplus');
+        Route::get('/daily-aerplus/show-by-period-v2', 'showByPeriodDailyAerplusV2');
         Route::post('/daily/save-setting', 'updateMagentaDailySalarySetting');
     });
 

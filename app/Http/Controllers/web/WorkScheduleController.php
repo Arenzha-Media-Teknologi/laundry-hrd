@@ -5,6 +5,7 @@ namespace App\Http\Controllers\web;
 use App\Exports\workschedules\WorkScheduleByEmployeeExport;
 use App\Exports\workschedules\WorkScheduleByOfficeExport;
 use App\Http\Controllers\Controller;
+use App\Models\Attendance;
 use App\Models\Company;
 use App\Models\DailySalary;
 use App\Models\Employee;
@@ -112,9 +113,7 @@ class WorkScheduleController extends Controller
                 'salaryComponents' => function ($q) {
                     $q->orderBy('employee_salary_component.id', 'DESC')->orderBy('employee_salary_component.effective_date', 'DESC');
                 },
-            ])
-                ->where('aerplus_daily_salary', 1)
-                ->where('active', 1)->get();
+            ])->where('aerplus_daily_salary', 1)->where('active', 1)->get();
 
             // return collect($employees[0])->except(['attendances', 'salary_components'])->all();
 
@@ -123,11 +122,46 @@ class WorkScheduleController extends Controller
             // Number of days
             $numberOfDays = Carbon::parse($startDate)->diffInDays($endDate);
 
-            $employees = collect($employees)->map(function ($employee) use ($periodDates) {
-                $schedules = collect($periodDates)->map(function ($date) {
+            // $employees = collect($employees)->map(function ($employee) use ($periodDates) {
+            //     $schedules = collect($periodDates)->map(function ($date) {
+            //         return [
+            //             'work_schedule_working_pattern_id' => '',
+            //             'office_id' => '',
+            //         ];
+            //     })->all();
+
+            //     $dailyWage = collect($employee->salaryComponents)->where('salary_type', 'uang_harian')->first()['pivot']['amount'] ?? 0;
+
+            //     $employee->schedules = $schedules;
+            //     $employee->daily_wage = $dailyWage;
+
+            //     return $employee;
+            // })->all();
+
+            $workSchedule = WorkSchedule::with(['items' => function ($q) {
+                $q->orderBy('id', 'DESC');
+            }])->orderBy('end_date', 'DESC')->first();
+
+            $groupedWorkScheduleItems = collect($workSchedule->items)->groupBy(['employee_id'])->all();
+
+            // return $groupedWorkScheduleItems;
+
+            $employees = collect($employees)->map(function ($employee) use ($periodDates, $groupedWorkScheduleItems) {
+                $schedules = collect($periodDates)->map(function ($date, $periodDateIndex) use ($employee, $groupedWorkScheduleItems) {
+                    $workingPattern = $groupedWorkScheduleItems[$employee->id][$periodDateIndex] ?? null;
+                    $workingPatternId = $workingPattern->work_schedule_working_pattern_id ?? '';
+                    $officeId = $workingPattern->office_id ?? '';
+                    if ($workingPattern != null) {
+                        if (($workingPattern->is_off ?? null) == 1) {
+                            $workingPatternId = 'off';
+                        }
+                    }
                     return [
-                        'work_schedule_working_pattern_id' => '',
-                        'office_id' => '',
+                        // 'date' => $date,
+                        // 'date_index' => $periodDateIndex,
+                        // 'working_pattern' => $groupedWorkScheduleItems[$employee->id][$periodDateIndex] ?? null,
+                        'work_schedule_working_pattern_id' => $workingPatternId,
+                        'office_id' => $officeId,
                     ];
                 })->all();
 
@@ -228,6 +262,12 @@ class WorkScheduleController extends Controller
             $q->with(['employee'])->where('is_off', 0);
         }])->find($id);
 
+        $employeeIds = collect($workSchedule->items)->pluck('employee_id')->unique()->all();
+
+        $attendances = Attendance::whereBetween('date', [$workSchedule->start_date, $workSchedule->end_date])->whereIn('employee_id', $employeeIds)->get()->groupBy(['date', 'employee_id'])->all();
+
+        // return $attendances;
+
         $workScheduleWorkingPatterns = WorkScheduleWorkingPattern::all();
 
         $offices = Office::all();
@@ -245,6 +285,7 @@ class WorkScheduleController extends Controller
             'work_schedule_working_patterns' => $workScheduleWorkingPatterns,
             'offices' => $offices,
             'period_dates' => $periodDates,
+            'attendances' => $attendances,
         ]);
     }
 
@@ -488,6 +529,11 @@ class WorkScheduleController extends Controller
                     }, 'activeCareer.jobTitle']);
                 }, 'office', 'workScheduleWorkingPattern'])->orderBy('id', 'DESC');
             }])->findOrFail($id);
+
+            $employeeIds = collect($workSchedule->items)->pluck('employee_id')->unique()->all();
+
+            $attendances = Attendance::whereBetween('date', [$workSchedule->start_date, $workSchedule->end_date])->whereIn('employee_id', $employeeIds)->get()->groupBy(['date', 'employee_id'])->all();
+
             $periods = $this->getDatesFromRange($workSchedule->start_date, $workSchedule->end_date);
 
             $groupedWorkScheduleItems = collect($workSchedule->items)->groupBy(['employee_id', 'date'])->all();
@@ -520,7 +566,7 @@ class WorkScheduleController extends Controller
             $startDate = $workSchedule->start_date;
             $endDate = $workSchedule->end_date;
 
-            return Excel::download(new WorkScheduleByEmployeeExport($employees, $periods, $startDate, $endDate), 'REKAPITULASI JADWAL KERJA (PEGAWAI) PERIODE ' . $startDate . ' - ' . $endDate . '.xlsx');
+            return Excel::download(new WorkScheduleByEmployeeExport($employees, $attendances, $periods, $startDate, $endDate), 'REKAPITULASI JADWAL KERJA (PEGAWAI) PERIODE ' . $startDate . ' - ' . $endDate . '.xlsx');
         } catch (\Throwable $th) {
             return response()->json([
                 'message' => $th->getMessage(),
@@ -545,6 +591,11 @@ class WorkScheduleController extends Controller
                     $q2->with(['activeCareer.jobTitle']);
                 }, 'office', 'workScheduleWorkingPattern'])->orderBy('id', 'DESC');
             }])->findOrFail($id);
+
+            $employeeIds = collect($workSchedule->items)->pluck('employee_id')->unique()->all();
+
+            $attendances = Attendance::whereBetween('date', [$workSchedule->start_date, $workSchedule->end_date])->whereIn('employee_id', $employeeIds)->get()->groupBy(['date', 'employee_id'])->all();
+
             $periods = $this->getDatesFromRange($workSchedule->start_date, $workSchedule->end_date);
 
             $groupedWorkScheduleItems = collect($workSchedule->items)->groupBy(['office_id', 'date', 'work_schedule_working_pattern_id'])->all();
@@ -574,7 +625,7 @@ class WorkScheduleController extends Controller
             $startDate = $workSchedule->start_date;
             $endDate = $workSchedule->end_date;
 
-            return Excel::download(new WorkScheduleByOfficeExport($offices, $workScheduleWorkingPatterns, $startDate, $endDate), 'REKAPITULASI JADWAL KERJA (OUTLET) PERIODE ' . $startDate . ' - ' . $endDate . '.xlsx');
+            return Excel::download(new WorkScheduleByOfficeExport($offices, $attendances, $workScheduleWorkingPatterns, $startDate, $endDate), 'REKAPITULASI JADWAL KERJA (OUTLET) PERIODE ' . $startDate . ' - ' . $endDate . '.xlsx');
 
             // return view('work-schedule.export.export-by-office', [
             //     'offices' => $offices,

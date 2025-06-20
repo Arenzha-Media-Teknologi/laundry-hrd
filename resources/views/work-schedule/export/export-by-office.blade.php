@@ -15,13 +15,15 @@
         <tr>
             <td rowspan="2" style="background-color: #B2DFDB;">{{ $office->name }}</td>
             @foreach($work_schedule_working_patterns as $work_schedule_working_pattern)
-            <td style="text-align: center; background-color: #B2DFDB;" colspan="2">{{ $work_schedule_working_pattern->name }} ({{ $work_schedule_working_pattern->start_time }} - {{ $work_schedule_working_pattern->end_time }})</td>
+            <td style="text-align: center; background-color: #B2DFDB;" colspan="4">{{ $work_schedule_working_pattern->name }} ({{ $work_schedule_working_pattern->start_time }} - {{ $work_schedule_working_pattern->end_time }})</td>
             @endforeach
         </tr>
         <tr>
             @foreach($work_schedule_working_patterns as $work_schedule_working_pattern)
             <td style="background-color: #B2DFDB;">Pegawai</td>
             <td style="background-color: #B2DFDB;">Jabatan</td>
+            <td style="background-color: #B2DFDB;">Status</td>
+            <td style="background-color: #B2DFDB;">Keterlambatan</td>
             @endforeach
         </tr>
     </thead>
@@ -43,6 +45,30 @@
             @foreach($period['schedules'] as $schedule)
             <td>{{ $schedule[$i]->employee->name ?? '' }}</td>
             <td>{{ $schedule[$i]->employee->activeCareer->jobTitle->name ?? '' }}</td>
+            <?php
+            $attendance = $attendances[$schedule[$i]->date ?? -1][$schedule[$i]->employee_id ?? -1][0] ?? null;
+            ?>
+            @if($attendance != null)
+            <td>
+                @if($attendance->status == "hadir")
+                Hadir
+                @elseif($attendance->status == "izin")
+                Izin
+                @elseif($attendance->status == "sakit")
+                Sakit
+                @elseif($attendance->status == "cuti")
+                Cuti
+                @endif
+            </td>
+            <td>
+                @if($attendance->time_late > 0)
+                {{ $attendance->time_late }}
+                @endif
+            </td>
+            @else
+            <td></td>
+            <td></td>
+            @endif
             @endforeach
             </tr>
             @endfor

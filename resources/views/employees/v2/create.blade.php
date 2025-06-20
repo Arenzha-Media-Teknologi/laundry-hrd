@@ -216,7 +216,7 @@
                                     <label class="required form-label fs-7">Kantor:</label>
                                 </div>
                                 <div class="col-md-8">
-                                    <select v-model="model.officeId" class="form-select form-select-sm mb-2">
+                                    <select class="form-select form-select-sm mb-2" id="select-office">
                                         <option value="">Pilih Kantor</option>
                                         <option v-for="(office, index) in filteredOffices" :key="office.id" :value="office.id">@{{ office.name }}</option>
                                     </select>
@@ -630,6 +630,21 @@
                 <!--end::Card header-->
                 <!--begin::Card body-->
                 <div class="card-body pt-0">
+                    <div class="mb-7">
+                        <div class="row align-items-center">
+                            <div class="col-md-2">
+                                <label class="form-label fs-7">Izin:</label>
+                            </div>
+                            <div class="col-md-6">
+                                <select class="form-select form-select-sm" id="select-permission-approver">
+                                    <option value="">Pilih Pegawai</option>
+                                    @foreach($employees as $employee)
+                                    <option value="{{ $employee->id }}">{{ $employee->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
+                    </div>
                     <div>
                         <div class="row align-items-center">
                             <div class="col-md-2">
@@ -961,6 +976,7 @@
                     driversLicenses: [],
                     insuranceType: '',
                     insurances: [],
+                    permissionApprover: '',
                     overtimeApprover: '',
                 },
                 submitLoading: false,
@@ -1096,6 +1112,7 @@
                         driversLicenses,
                         insurances,
                         overtimeApprover,
+                        permissionApprover,
                     } = self.model;
 
                     const [employeeNumber] = self.employeeNumber;
@@ -1147,6 +1164,7 @@
                         photo,
                         drivers_licenses: driversLicenses,
                         insurances,
+                        permission_approver_id: permissionApprover,
                         overtime_approver_id: overtimeApprover,
                     };
 
@@ -1446,10 +1464,21 @@
             console.log("kt.imageinput.removed event is fired");
         });
 
+        $('#select-permission-approver').select2();
+        $('#select-permission-approver').on('change', function() {
+            const value = $(this).val();
+            app.$data.model.permissionApprover = value;
+        })
+
         $('#select-overtime-approver').select2();
         $('#select-overtime-approver').on('change', function() {
             const value = $(this).val();
             app.$data.model.overtimeApprover = value;
+        })
+
+        $('#select-office').select2();
+        $('#select-office').on('change', function(e) {
+            app.$data.model.officeId = $(this).val();
         })
     })
 </script>

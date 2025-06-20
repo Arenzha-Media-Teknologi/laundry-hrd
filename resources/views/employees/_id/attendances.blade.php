@@ -142,6 +142,7 @@
                             <th class="text-center">Status</th>
                             <th class="text-center">Jam Masuk</th>
                             <th class="text-center">Jam Keluar</th>
+                            <th class="text-center">Long Shift</th>
                             <th class="text-center">Lembur (Menit)</th>
                             <th class="text-center">Keterlambatan (Menit)</th>
                         </tr>
@@ -157,11 +158,29 @@
                                     <span class="badge badge-light-danger">@{{ event.name }}</span>
                                 </div>
                             </td>
-                            <td v-if="attendance.attendance !== null" class="text-center"><span class="text-uppercase badge" :class="statusBadgeColor(attendance.attendance).color">@{{ statusBadgeColor(attendance.attendance).text }}</span></td>
+                            <td v-if="attendance.attendance !== null" class="text-center">
+                                <div>
+                                    <span class="text-uppercase badge" :class="statusBadgeColor(attendance.attendance).color">@{{ statusBadgeColor(attendance.attendance).text }}</span>
+                                </div>
+                                <div v-cloak v-if="attendance.attendance.is_permission == 1" class="mt-2">
+                                    <span v-if="attendance.attendance.permission_status == 'pending'" class="badge badge-light-warning"><span class="align-middle">@{{ attendance.attendance.permission_category.name }} (Menunggu)</span> <i class="bi bi-clock text-warning align-middle"></i></span>
+                                    <span v-else-if="attendance.attendance.permission_status == 'approved'" class="badge badge-light-success"><span class="align-middle">@{{ attendance.attendance.permission_category.name }} (Disetujui)</span> <i class="bi bi-check text-success align-middle"></i></span>
+                                    <span v-else-if="attendance.attendance.permission_status == 'rejected'" class="badge badge-light-danger"><span class="align-middle">@{{ attendance.attendance.permission_category.name }} (Ditolak)</span> <i class="bi bi-x text-danger align-middle"></i></span>
+                                </div>
+                            </td>
                             <td v-else></td>
                             <td v-if="attendance.attendance !== null" class="text-center">@{{ attendance.attendance.clock_in_time }}</td>
                             <td v-else></td>
                             <td v-if="attendance.attendance !== null" class="text-center">@{{ attendance.attendance.clock_out_time }}</td>
+                            <td v-else></td>
+                            <td v-if="attendance.attendance !== null" class="text-center">
+                                <div v-cloak v-if="attendance.attendance.is_long_shift == 1">
+                                    <!-- @{{ attendance.attendance.long_shift_status }} -->
+                                    <span v-if="attendance.attendance.long_shift_status == 'pending'" class="badge badge-light-warning">Pending</span>
+                                    <span v-else-if="attendance.attendance.long_shift_status == 'approved'" class="badge badge-light-success">Disetujui (@{{ attendance.attendance?.long_shift_confirmer?.name ?? 'Approver' }} - @{{ attendance.attendance.long_shift_confirmed_at }})</span>
+                                    <span v-else-if="attendance.attendance.long_shift_status == 'rejected'" class="badge badge-light-danger">Ditolak (@{{ attendance.attendance?.long_shift_confirmer?.name ?? 'Approver' }} - @{{ attendance.attendance.long_shift_confirmed_at }})</span>
+                                </div>
+                            </td>
                             <td v-else></td>
                             <td v-if="attendance.attendance !== null" class="text-center">@{{ attendance.attendance.overtime }}</td>
                             <td v-else></td>
@@ -282,7 +301,10 @@
                 }
             },
             statusBadgeColor(attendance) {
-                const status = attendance?.status;
+                let status = attendance?.status;
+                // if (status.is_permission == 1) {
+                //     status = "izin";
+                // }
                 const leaveCategoryName = attendance?.leave_application?.category?.name;
                 switch (status) {
                     case 'hadir':

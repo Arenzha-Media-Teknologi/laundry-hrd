@@ -201,6 +201,7 @@ class UpdateEmployeeRequest extends FormRequest
             'magenta_daily_salary' => 'nullable',
             'aerplus_daily_salary' => 'nullable',
             'overtime_approver_id' => 'nullable',
+            'permission_approver_id' => 'nullable',
             'image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
         ];
     }

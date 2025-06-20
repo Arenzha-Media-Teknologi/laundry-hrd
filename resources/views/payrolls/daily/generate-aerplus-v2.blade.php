@@ -273,8 +273,13 @@
                                     <tr v-for="(salary, index) in selectedDetailSalary.periods" class="fw-bold fs-6 text-gray-700">
                                         <td class="text-gray-600 ps-2">@{{ salary.date }}</td>
                                         <td class="text-gray-700">
-                                            <span v-if="salary.attendance.working_pattern_day == 'holiday' || salary.attendance.event_calendars.length" class="text-danger">@{{ salary.day_name }}</span>
-                                            <span v-else>@{{ salary.day_name }}</span>
+                                            <div>
+                                                <span v-if="salary.attendance.working_pattern_day == 'holiday' || salary.attendance.event_calendars.length" class="text-danger"><strong>@{{ salary.day_name }}</strong></span>
+                                                <span v-else><strong>@{{ salary.day_name }}</strong></span>
+                                            </div>
+                                            <div>
+                                                <small> @{{ salary.office_name }}</small>
+                                            </div>
                                         </td>
                                         <td>
                                             <div v-for="event in salary.events" class="mb-3">

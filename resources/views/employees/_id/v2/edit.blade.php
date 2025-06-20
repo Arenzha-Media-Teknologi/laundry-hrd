@@ -642,6 +642,21 @@
                 <!--end::Card header-->
                 <!--begin::Card body-->
                 <div class="card-body pt-0">
+                    <div class="mb-7">
+                        <div class="row align-items-center">
+                            <div class="col-md-2">
+                                <label class="form-label fs-7">Izin:</label>
+                            </div>
+                            <div class="col-md-6">
+                                <select class="form-select form-select-sm" id="select-permission-approver">
+                                    <option value="">Pilih Pegawai</option>
+                                    @foreach($employees as $approver)
+                                    <option value="{{ $approver->id }}">{{ $approver->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
+                    </div>
                     <div>
                         <div class="row align-items-center">
                             <div class="col-md-2">
@@ -978,6 +993,7 @@
                     driversLicenses,
                     insuranceType: '',
                     insurances: employeeInsurances,
+                    permissionApprover: '{{ $employee->permission_approver_id }}',
                     overtimeApprover: '{{ $employee->overtime_approver_id }}',
                 },
                 submitLoading: false,
@@ -1112,6 +1128,7 @@
                         salary,
                         driversLicenses,
                         insurances,
+                        permissionApprover,
                         overtimeApprover,
                     } = self.model;
 
@@ -1164,6 +1181,7 @@
                         photo,
                         drivers_licenses: driversLicenses,
                         insurances,
+                        permission_approver_id: permissionApprover,
                         overtime_approver_id: overtimeApprover,
                     };
 
@@ -1464,6 +1482,16 @@
         imageInput.on("kt.imageinput.removed", function() {
             console.log("kt.imageinput.removed event is fired");
         });
+
+        if (app.$data.model.permissionApprover) {
+            $('#select-permission-approver').val(app.$data.model.permissionApprover).trigger('change');
+        }
+
+        $('#select-permission-approver').select2();
+        $('#select-permission-approver').on('change', function() {
+            const value = $(this).val();
+            app.$data.model.permissionApprover = value;
+        })
 
         if (app.$data.model.overtimeApprover) {
             $('#select-overtime-approver').val(app.$data.model.overtimeApprover).trigger('change');

@@ -12,6 +12,7 @@ use App\Models\EventCalendar;
 use App\Models\LeaveApplication;
 use App\Models\SickApplication;
 use App\Models\WorkingPattern;
+use App\Models\WorkScheduleItem;
 use Carbon\Carbon;
 use DateInterval;
 use DatePeriod;
@@ -212,6 +213,27 @@ class EmployeeApiController extends Controller
                 $todayClockOutTime = date('Y-m-d') . ' ' . ($todayWorkingPatternItem->clock_out ?? "17:00:00");
             }
 
+            $workScheduleOffice = $employee->office;
+            $date = date('Y-m-d');
+            $todayWorkSchedule = WorkScheduleItem::with(['workScheduleWorkingPattern'])->where('employee_id', $id)->where('date', $date)->first();
+            if (isset($todayWorkSchedule)) {
+                $workScheduleOffice = $todayWorkSchedule->office ?? null;
+                $todayClockInTime = null;
+                $todayClockOutTime = null;
+                if ($todayWorkSchedule->is_off != 1) {
+                    $workingPattern = $todayWorkSchedule->workScheduleWorkingPattern;
+                    // return $workingPattern;
+                    if ($workingPattern != null) {
+                        $todayClockInTime = date('Y-m-d') . ' ' . ($workingPattern->start_time ?? "07:00:00");
+                        $todayClockOutTime = date('Y-m-d') . ' ' . ($workingPattern->end_time ?? "17:00:00");
+                    }
+                }
+            }
+
+            $employee->work_schedule_office = $workScheduleOffice;
+
+            // return $todayWorkSchedule;
+
             $todayLastClockIn = $employee->attendances[0] ?? null;
             $isLongShiftAvailable = false;
             $longShiftWorkingPatternId = null;
@@ -326,6 +348,10 @@ class EmployeeApiController extends Controller
 
             // 4, 193
             // 4, 192
+
+            $isPermissionApprover = Employee::where('active', 1)->where('permission_approver_id', $employee->id)->count() > 0;
+
+            $employee->is_permission_approver = $isPermissionApprover;
 
             $isOvertimeApprover = Employee::where('active', 1)->where('overtime_approver_id', $employee->id)->count() > 0;
 
@@ -954,6 +980,28 @@ class EmployeeApiController extends Controller
             // $employee = 
             $insights = [];
 
+            $todayWorkSchedule = WorkScheduleItem::with(['workScheduleWorkingPattern'])->where('employee_id', $id)->where('date', date('Y-m-d'))->first();
+            if ($todayWorkSchedule != null) {
+                $isOff = $todayWorkSchedule->is_off;
+                if (!$isOff) {
+                    $insights[] = [
+                        'title' => 'Jadwal Hari Ini',
+                        'description' => 'Jadwal kerja kamu hari ini',
+                        'content' => ($todayWorkSchedule->workScheduleWorkingPattern->name ?? 'Shift') . ' | '  . ($todayWorkSchedule->workScheduleWorkingPattern->start_time ?? 'Jam Mulai') . ' - ' . ($todayWorkSchedule->workScheduleWorkingPattern->end_time ?? 'Jam Pulang'),
+                        'sub_content' => ($todayWorkSchedule->office->name ?? 'Outlet'),
+                        'type' => 'success',
+                    ];
+                } else {
+                    $insights[] = [
+                        'title' => 'Jadwal Hari Ini',
+                        'description' => 'Jadwal kerja kamu hari ini',
+                        'content' => 'OFF',
+                        'sub_content' => '',
+                        'type' => 'success',
+                    ];
+                }
+            }
+
             $salaryStartDayPeriod = 26;
             $salaryStartMonthPeriod = $request->query('month') ?? date('m');
             $salaryStartYearPeriod = $request->query('year') ?? date('Y');
@@ -1240,6 +1288,8 @@ class EmployeeApiController extends Controller
                 ];
             }
 
+
+
             return response()->json([
                 'message' => 'OK',
                 'data' => $insights,
@@ -1248,6 +1298,60 @@ class EmployeeApiController extends Controller
             return response()->json([
                 'message' => $th->getMessage()
             ]);
+        }
+    }
+
+    public function monthlyWorkSchedules($id)
+    {
+        try {
+            $month = request()->query('month') ?? date('Y-m');
+
+            $startDate = date($month . '-01');
+            $endDate = date("Y-m-t", strtotime($startDate));
+            $employee = Employee::with(['activeCareer', 'workScheduleItems' => function ($q) use ($startDate, $endDate) {
+                $q->with(['workScheduleWorkingPattern'])->whereBetween('date', [$startDate, $endDate])->orderBy('id', 'desc');
+            }, 'activeWorkingPatterns.items'])->findOrFail($id);
+
+            $workScheduleItems = $employee->workScheduleItems;
+            $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+
+            $datesRange = $this->getDatesFromRange($startDate, $endDate);
+            $finalWorkScheduleItems = collect($datesRange)->map(function ($date, $key) use ($workScheduleItems, $days) {
+                $carbonDate = Carbon::parse($date);
+                $dayIndex = $carbonDate->dayOfWeekIso;
+                $workScheduleItem = collect($workScheduleItems)->where('date', $date)->first();
+
+                $item = [
+                    'date' => $date,
+                    'iso_date' => $carbonDate->isoFormat('ll'),
+                    'day' => $days[$dayIndex - 1],
+                    // 'schedule' => null,
+                    'schedule_id' => null,
+                    'is_off' => null,
+                    'office_name' => null,
+                    'working_pattern_name' => null,
+                    'working_pattern_time' => null,
+                ];
+
+                if ($workScheduleItem !== null) {
+                    // $item['schedule'] = $workScheduleItem;
+                    $item['schedule_id'] = $workScheduleItem->id;
+                    $item['is_off'] = $workScheduleItem->is_off;
+                    $item['office_name'] = $workScheduleItem->office->name ?? null;
+                    $item['working_pattern_name'] = $workScheduleItem->workScheduleWorkingPattern->name ?? null;
+                    $item['working_pattern_time'] = ($workScheduleItem->workScheduleWorkingPattern->start_time ?? 'Waktu Mulai') . ' - ' . ($workScheduleItem->workScheduleWorkingPattern->end_time ?? 'Waktu Mulai');
+                }
+
+                return $item;
+            })->all();
+
+            return response()->json([
+                'data' => $finalWorkScheduleItems,
+            ]);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'message' => $th->getMessage(),
+            ], 500);
         }
     }
 }

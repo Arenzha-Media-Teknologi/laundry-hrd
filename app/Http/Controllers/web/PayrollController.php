@@ -2156,6 +2156,205 @@ class PayrollController extends Controller
     }
 
     /**
+     * Show by period
+     */
+    public function showByPeriodDailyAerplusV2(Request $request)
+    {
+        $startDate = $request->query('start_date');
+        $endDate = $request->query('end_date');
+
+        if ($startDate == null || $endDate == null) {
+            abort(404);
+        }
+
+        $dailySalaries = DailySalary::with(['employee' => function ($q) {
+            $q->with(['activeCareer' => function ($q2) {
+                $q2->with(['jobTitle']);
+            }, 'office']);
+        }])
+            ->where('type', 'aerplus')
+            ->where('start_date', $startDate)
+            ->where('end_date', $endDate)
+            ->get();
+
+        $totalTakeHomePay = collect($dailySalaries)->sum('take_home_pay');
+
+        $paid = !empty(collect($dailySalaries)->where('paid', 1)->first()) ? true : false;
+
+        $offices = Office::all();
+
+        $dailyWagesByOfficeId = collect($dailySalaries)
+            ->flatMap(function ($dailySalary) {
+                return json_decode($dailySalary->incomes);
+            })
+            ->groupBy(function ($dailySalaryIncome) {
+                return $dailySalaryIncome->office_id;
+            })
+            ->map(function ($dailySalaryIncomes) {
+                return [
+                    'daily' => collect($dailySalaryIncomes)->sum('total')
+                ];
+            })
+            ->all();
+
+        $additionalSalaryComponentsByOfficeId = collect($dailySalaries)->groupBy(function ($dailySalary) {
+            return $dailySalary->employee->office->id ?? 0;
+        })->map(function ($dailySalaries) {
+            $totalAllRedeemDeposit = 0;
+            $totalAllDeposit = 0;
+            $totalAllLateFee = 0;
+            $totalAllLoan = 0;
+
+            collect($dailySalaries)->each(function ($dailySalary) use (&$totalAllDeposit, &$totalAllRedeemDeposit, &$totalAllLateFee, &$totalAllLoan) {
+                $additionalIncomes = json_decode($dailySalary->additional_incomes ?? "[]");
+                $deductions = json_decode($dailySalary->deductions ?? "[]");
+
+                $totalRedeemDeposit = collect($additionalIncomes)->where('type', 'redeem_deposit')->sum('value');
+
+                $totalDeposit = collect($deductions)->where('type', 'deposit')->sum('value');
+                $totalLateFee = collect($deductions)->where('type', 'late_fee')->sum('value');
+                $totalLoan = collect($deductions)->where('type', 'loan')->sum('value');
+
+                $totalAllDeposit += $totalDeposit;
+                $totalAllRedeemDeposit += $totalRedeemDeposit;
+                $totalAllLateFee += $totalLateFee;
+                $totalAllLoan += $totalLoan;
+            });
+
+            return [
+                'total_all_deposit' => $totalAllDeposit,
+                'total_all_redeem_deposit' => $totalAllRedeemDeposit,
+                'total_all_late_fee' => $totalAllLateFee,
+                'total_all_loan' => $totalAllLoan,
+            ];
+        })->all();
+
+        $dailyWagesByOfficeIdKeys = collect($dailyWagesByOfficeId)->keys()->all();
+        $additionalSalaryComponentsByOfficeIdKeys = collect($additionalSalaryComponentsByOfficeId)->keys()->all();
+
+        $dailySalaryOfficeIds = collect($dailyWagesByOfficeIdKeys)->merge($additionalSalaryComponentsByOfficeIdKeys)->unique()->all();
+        $dailySalaryOffices = collect($offices)->whereIn('id', $dailySalaryOfficeIds)->all();
+
+        $officesById = collect($offices)->mapWithKeys(function ($office) {
+            return [
+                $office->id => $office->name
+            ];
+        })->all();
+        // return $officesById;
+
+        $outletSpendingPayloads = collect($dailySalaryOffices)->map(function ($office) use ($dailyWagesByOfficeId, $additionalSalaryComponentsByOfficeId, $startDate, $endDate, $officesById) {
+            $totalDaily = $dailyWagesByOfficeId[$office->id]['daily'] ?? 0;
+            $totalDeposit = $additionalSalaryComponentsByOfficeId[$office->id]['total_all_deposit'] ?? 0;
+            $totalRedeemDeposit = $additionalSalaryComponentsByOfficeId[$office->id]['total_all_redeem_deposit'] ?? 0;
+            $totalLateFee = $additionalSalaryComponentsByOfficeId[$office->id]['total_all_late_fee'] ?? 0;
+            $totalLoan = $additionalSalaryComponentsByOfficeId[$office->id]['total_all_loan'] ?? 0;
+
+            $officeName = $officesById[$office->id] ?? '';
+            $description = "Gaji depot " . $officeName . " periode " . Carbon::parse($startDate)->isoFormat('LL') . ' - ' . Carbon::parse($endDate)->isoFormat('LL');
+
+            $additionalCredit = [];
+            $additionalDebit = [];
+
+            $finalAmount = 0;
+
+            // $hutangDepositKaryawan = $totalAllDeposit - $totalAllRedeemDeposit;
+            if ($totalRedeemDeposit > 0) {
+                $additionalDebit[] = [
+                    'amount' => $totalRedeemDeposit,
+                    'account_id' => 128,
+                ];
+            }
+
+            if ($totalLateFee > 0) {
+                $additionalCredit[] = [
+                    'amount' => $totalLateFee,
+                    'account_id' => 197,
+                ];
+            }
+
+            if ($totalDeposit > 0) {
+                $additionalCredit[] = [
+                    'amount' => $totalDeposit,
+                    'account_id' => 128,
+                ];
+            }
+
+            if ($totalLoan > 0) {
+                $additionalCredit[] = [
+                    'amount' => $totalLoan,
+                    'account_id' => 79,
+                ];
+            }
+
+            // Beban Gaji
+            $totalOutletTakeHomePay = $totalDaily - ($totalLoan + $totalLateFee);
+            $sofAmount = $totalOutletTakeHomePay;
+            $expenseAmount = $totalDaily - $totalRedeemDeposit;
+            $journalAmount = $totalDaily + $totalDeposit + $totalLateFee + $totalLoan;
+
+
+            // $accountTransaction1->date = $date;
+            // $accountTransaction1->description = 'PENGELUARAN PUSAT (HO)' . ' - '  . $expenseList['description'];
+            // $accountTransaction1->amount_type = 'CREDIT';
+            // $accountTransaction1->amount = $expenseList['amount'];
+            // $accountTransaction1->account_id = $sof;
+            // $accountTransaction1->journal_id = $journal->id;
+
+            return [
+                'date' => $endDate,
+                "account_id" => 5,
+                "outlet_id" => $office->id,
+                "to" => "",
+                "received_by" => "",
+                "description" => $description,
+                "outletSpendingList" => [[
+                    "partnerId" => "0",
+                    "tenantId" => "0",
+                    "monthlyCommission" => "",
+                    "termOfPaymentTenantId" => "",
+                    "supplierId" => "0",
+                    "expenditureTypeId" => 9,
+                    "transactionType" => "transfer",
+                    "amount" => $totalOutletTakeHomePay,
+                    "sof_amount" => $sofAmount,
+                    "expense_amount" => $expenseAmount,
+                    "journal_amount" => $journalAmount,
+                    "npwp" => "",
+                    "percentage" => "",
+                    "description" => $description,
+                    "hideDelete" => true,
+                    "disabledExpenditureType" => false,
+                    "additional_debit" => $additionalDebit,
+                    "additional_credit" => $additionalCredit,
+                ]],
+                "total" => $totalOutletTakeHomePay,
+                // 'total_deposit' => $totalAllDeposit,
+                // 'total_redeem_deposit' => $totalAllRedeemDeposit,
+            ];
+
+            // return [
+            //     'office_id' => $office->id,
+            //     'total_daily' => $totalDaily,
+            //     'total_deposit' => $totalDeposit,
+            //     'total_redeem_deposit' => $totalRedeemDeposit,
+            //     'total_late_fee' => $totalLateFee,
+            //     'total_loan' => $totalLoan,
+            // ];
+        })->all();
+
+        // return $outletSpendingPayloads;
+
+        return view('payrolls.daily.show-by-period-aerplus', [
+            'salaries' => $dailySalaries,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'total_thp' => $totalTakeHomePay,
+            'outlet_spending_payloads' => $outletSpendingPayloads,
+            'paid' => $paid,
+        ]);
+    }
+
+    /**
      * Generate Daily
      */
     public function generateDaily()

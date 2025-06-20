@@ -417,6 +417,8 @@ class AttendanceApiController extends Controller
                 // 'clock_in_attachment' => 'nullable|string',
             ]);
 
+            $splittedNote = explode('---', $request->clock_in_note ?? "");
+
             $employeeId = $request->employee_id;
             $attendanceDate = $request->date;
             $workingPatternId = $request->working_pattern_id;
@@ -431,7 +433,9 @@ class AttendanceApiController extends Controller
             $clockInIsInsideOfficeRadius = $request->clock_in_is_inside_office_radius;
             $clockInOfficeLatitude = $request->clock_in_office_latitude;
             $clockInOfficeLongitude = $request->clock_in_office_longitude;
-            $note = $request->clock_in_note;
+            $note = $splittedNote[1] ?? null;
+            $permissionNote = $splittedNote[0] ?? null;
+            $permissionCategoryId = $request->permission_category_id;
 
             $todayAttendance = Attendance::query()
                 ->where('employee_id', $employeeId)
@@ -552,6 +556,14 @@ class AttendanceApiController extends Controller
             $attendance->clock_in_attachment = $urlPath;
             $attendance->working_pattern_id = $workingPatternId;
             $attendance->work_schedule_working_pattern_id = $workScheduleWorkingPatternId;
+
+            if (!empty($permissionCategoryId)) {
+                $attendance->is_permission = 1;
+                $attendance->permission_category_id = $permissionCategoryId;
+                $attendance->permission_status = "pending";
+                $attendance->permission_note = $permissionNote;
+            }
+
             $attendance->save();
 
             $quotes = $this->getRandomQuotes();
@@ -1726,7 +1738,7 @@ class AttendanceApiController extends Controller
 
         $sickApplications = SickApplication::whereHas('employee.office.division', function ($q) use ($companyId) {
             $q->where('company_id', $companyId);
-        })->with(['employee'])->where('application_dates', 'LIKE', '%' . $date . '%')->get()->each(function ($sickApplication) {
+        })->with(['employee'])->where('application_dates', 'LIKE', '%' . $date . '%')->where('approval_status', 'approved')->get()->each(function ($sickApplication) {
             // collect($sickApplication)->put('type', 'sick')->all();
             $sickApplication->type = 'sakit';
         });
@@ -1735,7 +1747,7 @@ class AttendanceApiController extends Controller
 
         $leaveApplications = LeaveApplication::whereHas('employee.office.division', function ($q) use ($companyId) {
             $q->where('company_id', $companyId);
-        })->with(['category', 'employee'])->where('application_dates', 'LIKE', '%' . $date . '%')->get()->each(function ($leaveApplication) {
+        })->with(['category', 'employee'])->where('application_dates', 'LIKE', '%' . $date . '%')->where('approval_status', 'approved')->get()->each(function ($leaveApplication) {
             $leaveApplication->type = 'cuti';
         });
 
@@ -1790,9 +1802,13 @@ class AttendanceApiController extends Controller
             $employeeId = request()->query('employee_id');
             $startDate = request()->query('start_date');
             $endDate = request()->query('end_date');
+            $officeId = request()->query('office_id');
 
-            $overtimeQuery = Attendance::whereHas('employee', function ($q) use ($approverId) {
+            $overtimeQuery = Attendance::whereHas('employee', function ($q) use ($approverId, $officeId) {
                 $q->where('overtime_approver_id', $approverId);
+                if (!empty($officeId)) {
+                    $q->where('office_id', $officeId);
+                }
             })->with(['employee' => function ($q) {
                 $q->with(['office']);
             }])
@@ -1949,6 +1965,180 @@ class AttendanceApiController extends Controller
             return response()->json([
                 'message' => $th->getMessage(),
             ], 500);
+        }
+    }
+
+    // Permission
+    public function getPermissions()
+    {
+        try {
+            $status = request()->query('status');
+            $approverId = request()->query('approver_id');
+            $employeeId = request()->query('employee_id');
+            $startDate = request()->query('start_date');
+            $endDate = request()->query('end_date');
+
+            $permissionQuery = Attendance::whereHas('employee', function ($q) use ($approverId) {
+                $q->where('permission_approver_id', $approverId);
+            })->with(['permissionCategory', 'employee' => function ($q) {
+                $q->with(['office']);
+            }])->where('is_permission', 1);
+
+            if (!empty($status)) {
+                $permissionQuery->where('permission_status', $status);
+            }
+
+            if (!empty($employeeId)) {
+                $permissionQuery->where('employee_id', $employeeId);
+            }
+
+            if (!empty($startDate) && !empty($endDate)) {
+                $permissionQuery->whereBetween('date', [$startDate, $endDate]);
+            }
+
+            $permissions = $permissionQuery->simplePaginate(10)->withQueryString();
+
+            return response()->json([
+                'message' => 'OK',
+                'data' => $permissions,
+            ]);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'message' => $th->getMessage(),
+            ]);
+        }
+    }
+
+    public function getPendingPermissionsCount()
+    {
+        try {
+            $status = request()->query('status');
+            $approverId = request()->query('approver_id');
+            $employeeId = request()->query('employee_id');
+            $startDate = request()->query('start_date');
+            $endDate = request()->query('end_date');
+
+            // return $status;
+
+            $permissionQuery = Attendance::whereHas('employee', function ($q) use ($approverId) {
+                $q->where('permission_approver_id', $approverId);
+            })
+                ->with(['employee' => function ($q) {
+                    $q->with(['office']);
+                }])->where('is_permission', 1);
+
+            if (!empty($status)) {
+                $permissionQuery->where('permission_status', $status);
+            }
+
+            if (!empty($employeeId)) {
+                $permissionQuery->where('employee_id', $employeeId);
+            }
+
+            if (!empty($startDate) && !empty($endDate)) {
+                $permissionQuery->whereBetween('date', [$startDate, $endDate]);
+            }
+
+            $permissionCount = $permissionQuery->count();
+
+            return response()->json([
+                'message' => 'OK',
+                'data' => $permissionCount,
+            ]);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'message' => $th->getMessage(),
+            ]);
+        }
+    }
+
+    public function approveManyPermission(Request $request)
+    {
+        try {
+            $attendanceIds = $request->attendance_ids ?? "[]";
+            $confirmerId = $request->confirmer_id;
+            $attendanceIds = json_decode($attendanceIds);
+            Attendance::query()->whereIn('id', $attendanceIds)->update([
+                'status' => 'hadir',
+                'time_late' => 0,
+                'permission_status' => 'approved',
+                'permission_confirmed_by' => $confirmerId,
+                'permission_confirmed_at' => Carbon::now()->toDateTimeString(),
+            ]);
+
+            return response()->json([
+                'message' => 'Pengajuan izin berhasil disetujui',
+            ]);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'message' => $th->getMessage(),
+            ]);
+        }
+    }
+
+    public function rejectManyPermission(Request $request)
+    {
+        try {
+            $attendanceIds = $request->attendance_ids ?? "[]";
+            $confirmerId = $request->confirmer_id;
+            $attendanceIds = json_decode($attendanceIds);
+            Attendance::query()->whereIn('id', $attendanceIds)->update([
+                'status' => 'hadir',
+                'permission_status' => 'rejected',
+                'permission_confirmed_by' => $confirmerId,
+                'permission_confirmed_at' => Carbon::now()->toDateTimeString(),
+            ]);
+
+            return response()->json([
+                'message' => 'Perngajuan izin berhasil ditolak',
+            ]);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'message' => $th->getMessage(),
+            ]);
+        }
+    }
+
+    public function approvePermission($id, Request $request)
+    {
+        $confirmerId = $request->confirmer_id;
+
+        try {
+            Attendance::query()->where('id', $id)->update([
+                'permission_status' => 'approved',
+                'permission_confirmed_by' => $confirmerId,
+                'permission_confirmed_at' => Carbon::now()->toDateTimeString(),
+                'time_late' => 0,
+            ]);
+
+            return response()->json([
+                'message' => 'Pengajuan berhasil disetujui',
+            ]);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'message' => $th->getMessage(),
+            ]);
+        }
+    }
+
+    public function rejectPermission($id, Request $request)
+    {
+        $confirmerId = $request->confirmer_id;
+
+        try {
+            Attendance::query()->where('id', $id)->update([
+                'permission_status' => 'rejected',
+                'permission_confirmed_by' => $confirmerId,
+                'permission_confirmed_at' => Carbon::now()->toDateTimeString(),
+            ]);
+
+            return response()->json([
+                'message' => 'Pengajuan izin berhasil ditolak',
+            ]);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'message' => $th->getMessage(),
+            ]);
         }
     }
 }

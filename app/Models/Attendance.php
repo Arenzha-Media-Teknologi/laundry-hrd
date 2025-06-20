@@ -33,4 +33,9 @@ class Attendance extends Model
     {
         return $this->morphMany(IssueSettlement::class, 'issue_settlementable');
     }
+
+    public function permissionCategory()
+    {
+        return $this->belongsTo(PermissionCategory::class);
+    }
 }

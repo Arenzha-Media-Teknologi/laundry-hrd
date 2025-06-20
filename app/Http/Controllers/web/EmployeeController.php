@@ -1682,7 +1682,7 @@ class EmployeeController extends Controller
         $startDate = date("Y-m-01");
         $endDate = date("Y-m-t");
         $employee = Employee::with(['activeCareer', 'attendances' => function ($q) use ($currentMonth, $startDate, $endDate) {
-            $q->with(['leaveApplication.category'])->whereBetween('date', [$startDate, $endDate])->orderBy('id', 'desc');
+            $q->with(['leaveApplication.category', 'longShiftConfirmer', 'permissionCategory'])->whereBetween('date', [$startDate, $endDate])->orderBy('id', 'desc');
         }, 'activeWorkingPatterns.items'])->findOrFail($id);
 
         // return $employee;

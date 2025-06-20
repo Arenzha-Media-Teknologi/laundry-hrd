@@ -61,7 +61,7 @@
                     ?>
                     <div class="d-flex justify-content-between align-items-center">
                         <div class="fs-6 d-flex justify-content-between my-4">
-                            <div class="fw-bold">Periode &nbsp;<a href="/payrolls/daily-aerplus/show-by-period?start_date={{$startDate}}&end_date={{ $endDate }}" class="text-primary">{{ \Carbon\Carbon::parse($startDate)->isoFormat('ll') }} - {{ \Carbon\Carbon::parse($endDate)->isoFormat('ll') }}</a></div>
+                            <div class="fw-bold">Periode &nbsp;<a href="/payrolls/daily-aerplus/show-by-period-v2?start_date={{$startDate}}&end_date={{ $endDate }}" class="text-primary">{{ \Carbon\Carbon::parse($startDate)->isoFormat('ll') }} - {{ \Carbon\Carbon::parse($endDate)->isoFormat('ll') }}</a></div>
                         </div>
                         <div>
                             <!-- <a href="/daily-salaries/export/aerplus-report?start_date={{ $startDate }}&end_date={{ $endDate }}" target="_blank" class="btn btn-light-primary btn-sm">

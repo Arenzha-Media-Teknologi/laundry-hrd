@@ -34,7 +34,7 @@
         </div>
         <div class="d-flex">
             <button class="btn btn-dark me-3" data-bs-toggle="collapse" data-bs-target=".collapseSchedule" aria-expanded="false" aria-controls="collapseSchedule"><i class="bi bi-chevron-down"></i> Semua</button>
-            <a href="#" class="btn btn-primary"><i class="bi bi-pencil"></i> Ubah</a>
+            <a href="/work-schedules/{{ $work_schedule->id }}/edit" class="btn btn-primary"><i class="bi bi-pencil"></i> Ubah</a>
         </div>
     </div>
     <div class="separator my-5" style="border-bottom-width: 3px;"></div>
@@ -72,6 +72,23 @@
                                         <div class="row">
                                             <div class="col-md-10">
                                                 {{ $item->employee->name ?? 'NAMA_PEGAWAI' }}
+                                                <?php
+                                                $attendance = $attendances[$period_date][$item->employee_id][0] ?? null;
+                                                ?>
+                                                @if($attendance != null)
+                                                @if($attendance->status == "hadir")
+                                                <span class="badge badge-success">Hadir ({{ $attendance->clock_in_time }})</span>
+                                                @if($attendance->time_late > 0)
+                                                <span class="badge badge-danger">Telat {{ $attendance->time_late }} menit</span>
+                                                @endif
+                                                @elseif($attendance->status == "izin")
+                                                <span class="badge badge-primary">Izin</span>
+                                                @elseif($attendance->status == "sakit")
+                                                <span class="badge badge-warning">Sakit</span>
+                                                @elseif($attendance->status == "cuti")
+                                                <span class="badge badge-info">Cuti</span>
+                                                @endif
+                                                @endif
                                             </div>
                                             <div class="col-md-2 text-end">
                                                 <a href="/work-schedules/{{ $work_schedule->id }}/edit?search={{ strtolower($item->employee->name) }}" target="_blank"><i class="bi bi-pencil"></i></a>

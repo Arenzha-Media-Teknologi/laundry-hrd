@@ -235,7 +235,9 @@ class DailySalaryController extends Controller
                 $q->whereBetween('date', [$startDate, $endDate])->orderBy('id', 'desc');
             }, 'activeWorkingPatterns' => function ($q) {
                 $q->with(['items']);
-            }, 'activeCareer.jobTitle', 'salaryComponents'])->where('magenta_daily_salary', 1)->where('active', 1)->orderBy('name')->get();
+            }, 'activeCareer.jobTitle', 'salaryComponents', 'workScheduleItems' => function ($q) use ($startDate, $endDate) {
+                $q->where('date', '>=', $startDate)->where('end_date', '<=', $endDate);
+            }])->where('magenta_daily_salary', 1)->where('active', 1)->orderBy('name')->get();
 
             // return $employees;
 
@@ -246,11 +248,24 @@ class DailySalaryController extends Controller
             // Number of days
             $numberOfDays = Carbon::parse($startDate)->diffInDays($endDate);
 
-            $salaries = collect($employees)->map(function ($employee) use ($periodDates, $eventCalendars, $numberOfDays) {
+            $offices = Office::all();
+            $officeNamesById = collect($offices)->mapWithKeys(function ($office) {
+                return [
+                    $office->id => $office->name
+                ];
+            });
+
+            $salaries = collect($employees)->map(function ($employee) use ($periodDates, $eventCalendars, $numberOfDays, $officeNamesById) {
                 $attendances = $employee->attendances;
                 $workingPatterns = $employee->activeWorkingPatterns;
                 $activeWorkingPattern = collect($workingPatterns)->first();
                 $salaryComponents = $employee->salaryComponents;
+                $workScheduleItems = $employee->workScheduleItems;
+                $workScheduleItemsByDate = collect($employee->workScheduleItems)->mapWithKeys(function ($workScheduleItem) {
+                    return [
+                        $workScheduleItem->date => $workScheduleItem->office_id,
+                    ];
+                })->all();
 
                 $dailyWageComponent = collect($salaryComponents)->where('salary_type', 'uang_harian')->first();
                 $overtimePayComponent = collect($salaryComponents)->where('salary_type', 'lembur')->first();
@@ -283,7 +298,7 @@ class DailySalaryController extends Controller
                 // $overtimePay = 5000;
                 // $overtimePayCoefficient = 2;
 
-                $periods = collect($periodDates)->map(function ($date) use ($attendances, $activeWorkingPattern, $eventCalendars, $employeeWage, &$totalTimeLate) {
+                $periods = collect($periodDates)->map(function ($date) use ($attendances, $activeWorkingPattern, $eventCalendars, $employeeWage, &$totalTimeLate, $workScheduleItemsByDate, $officeNamesById) {
                     // Resource
                     $newestAttendance = collect($attendances)->where('date', $date)->first();
                     $currentEvents = collect($eventCalendars)->filter(function ($event) use ($date) {
@@ -424,6 +439,9 @@ class DailySalaryController extends Controller
                         }
                     }
 
+                    $officeId = $workScheduleItemsByDate[$date] ?? null;
+                    $officeName = $officeNamesById[$officeId] ?? "";
+
                     return [
                         'date' => $date,
                         // 'attendance' => $newestAttendance,
@@ -437,6 +455,8 @@ class DailySalaryController extends Controller
                         'total' => $dailyWage + round($overtimePay),
                         'attendance' => $attendance,
                         'event_calendars' => $currentEvents,
+                        'office_id' => $officeId,
+                        'office_name' => $officeName,
                         // 'working_pattern_day' => $workingPatternDay,
                     ];
                 })->all();
@@ -529,6 +549,9 @@ class DailySalaryController extends Controller
                         $itemQuery->where('paid', 0);
                         // ->whereBetween('payment_date', [$startDate, $endDate]);
                     }]);
+                },
+                'workScheduleItems' => function ($q) use ($startDate, $endDate) {
+                    $q->where('date', '>=', $startDate)->where('date', '<=', $endDate);
                 }
             ])->where('aerplus_daily_salary', 1)->where('active', 1)->get();
 
@@ -541,12 +564,25 @@ class DailySalaryController extends Controller
             // Number of days
             $numberOfDays = Carbon::parse($startDate)->diffInDays($endDate);
 
-            $salaries = collect($employees)->map(function ($employee) use ($periodDates, $eventCalendars, $numberOfDays) {
+            $offices = Office::all();
+            $officeNamesById = collect($offices)->mapWithKeys(function ($office) {
+                return [
+                    $office->id => $office->name
+                ];
+            });
+
+            $salaries = collect($employees)->map(function ($employee) use ($periodDates, $eventCalendars, $numberOfDays, $officeNamesById) {
                 $attendances = $employee->attendances;
                 $workingPatterns = $employee->activeWorkingPatterns;
                 $activeWorkingPattern = collect($workingPatterns)->first();
                 // -------
                 $salaryComponents = $employee->salaryComponents;
+                $workScheduleItems = $employee->workScheduleItems;
+                $workScheduleItemsByDate = collect($workScheduleItems)->mapWithKeys(function ($workScheduleItem) {
+                    return [
+                        $workScheduleItem->date => $workScheduleItem->office_id,
+                    ];
+                })->all();
 
                 $dailyWageComponent = collect($salaryComponents)->where('salary_type', 'uang_harian')->first();
                 $uangMakanComponent = collect($salaryComponents)->where('salary_type', 'uang_makan')->first();
@@ -592,7 +628,7 @@ class DailySalaryController extends Controller
                 // $overtimePayCoefficient = 2;
                 // (Harian / 2) + Harian + Tunjangan
 
-                $periods = collect($periodDates)->map(function ($date) use ($employee, $attendances, $activeWorkingPattern, $eventCalendars, $employeeWage, &$totalTimeLate, $uangMakanComponent, $dailyWageComponent) {
+                $periods = collect($periodDates)->map(function ($date) use ($employee, $attendances, $activeWorkingPattern, $eventCalendars, $employeeWage, &$totalTimeLate, $uangMakanComponent, $dailyWageComponent, $workScheduleItemsByDate, $officeNamesById) {
                     // Resource
                     $newestAttendance = collect($attendances)->where('date', $date)->first();
                     $currentEvents = collect($eventCalendars)->filter(function ($event) use ($date) {
@@ -675,6 +711,9 @@ class DailySalaryController extends Controller
                         }
                     }
 
+                    $officeId = $workScheduleItemsByDate[$date] ?? null;
+                    $officeName = $officeNamesById[$officeId] ?? "";
+
                     return [
                         'date' => $date,
                         'day_name' => Carbon::parse($date)->locale('id')->dayName,
@@ -686,6 +725,8 @@ class DailySalaryController extends Controller
                         'editing_overtime_pay' => false,
                         'total' => $dailyWage + round($overtimePay),
                         'attendance' => $attendance,
+                        'office_id' => $officeId,
+                        'office_name' => $officeName,
                     ];
                 })->all();
 
