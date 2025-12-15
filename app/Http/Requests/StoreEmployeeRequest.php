@@ -26,6 +26,7 @@ class StoreEmployeeRequest extends FormRequest
     {
         return [
             'name' => 'required|string|max:255',
+            'alias' => 'nullable|string|max:255',
             'gender' => [
                 'required',
                 Rule::in(['male', 'female'])
@@ -102,6 +103,7 @@ class StoreEmployeeRequest extends FormRequest
     {
         return [
             'name' => 'nama',
+            'alias' => 'nama panggilan',
             'number' => 'nomor pegawai',
             'gender' => 'jenis kelamin',
             'place_of_birth' => 'tempat lahir',

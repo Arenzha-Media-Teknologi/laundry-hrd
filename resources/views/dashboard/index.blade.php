@@ -121,6 +121,200 @@ $permissions = json_decode($groupPermissions);
                 <!--begin::Header-->
                 <div class="card-header border-0 pt-5">
                     <h3 class="card-title align-items-start flex-column">
+                        <span class="card-label fw-bolder fs-3 mb-1">Pegawai Terlambat Bulan Berjalan</span>
+                        <span class="text-muted mt-1 fw-bold fs-7">Daftar pegawai yang terlambat di bulan {{ \Carbon\Carbon::now()->locale('id')->isoFormat('MMMM YYYY') }}</span>
+                    </h3>
+                </div>
+                <!--end::Header-->
+                <!--begin::Body-->
+                <div class="card-body py-3">
+                    <div class="mb-5 hover-scroll-x" style="border-bottom: none;">
+                        <div class="d-grid">
+                            <ul class="nav nav-tabs flex-nowrap text-nowrap" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <a class="nav-link btn btn-active-light btn-color-gray-600 btn-active-color-primary rounded-bottom-0 active" data-bs-toggle="tab" href="#tab_three_times_late" aria-selected="true" role="tab">
+                                        <i class="bi bi-exclamation-triangle align-middle"></i>
+                                        <span class="align-middle">Terlambat 3x</span>
+                                        <span class="badge badge-danger ms-2">{{ count($late_employees_data['three_times_late']) }}</span>
+                                    </a>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <a class="nav-link btn btn-active-light btn-color-gray-600 btn-active-color-primary rounded-bottom-0" data-bs-toggle="tab" href="#tab_two_times_late_sp1" aria-selected="false" role="tab" tabindex="-1">
+                                        <i class="bi bi-exclamation-circle align-middle"></i>
+                                        <span class="align-middle">Terlambat 2x (SP1)</span>
+                                        <span class="badge badge-warning ms-2">{{ count($late_employees_data['two_times_late_in_sp1']) }}</span>
+                                    </a>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <a class="nav-link btn btn-active-light btn-color-gray-600 btn-active-color-primary rounded-bottom-0" data-bs-toggle="tab" href="#tab_one_time_late_sp2" aria-selected="false" role="tab" tabindex="-1">
+                                        <i class="bi bi-info-circle align-middle"></i>
+                                        <span class="align-middle">Terlambat 1x (SP2)</span>
+                                        <span class="badge badge-info ms-2">{{ count($late_employees_data['one_time_late_in_sp2']) }}</span>
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="tab-content" id="lateEmployeesTabContent">
+                        <!-- Tab: Three Times Late -->
+                        <div class="tab-pane fade show active" id="tab_three_times_late" role="tabpanel">
+                            <div class="table-responsive" style="max-height: 400px;">
+                                <table class="table align-middle table-row-dashed fs-7 gy-5">
+                                    <thead class="bg-light-danger">
+                                        <tr class="text-center text-gray-700 fw-bolder fs-7 text-uppercase gs-0">
+                                            <th class="text-start min-w-150px ps-2">Pegawai</th>
+                                            <th class="text-center min-w-150px">Perusahaan</th>
+                                            <th class="text-center min-w-150px">Divisi</th>
+                                            <th class="text-center min-w-150px">Kantor</th>
+                                            <th class="text-center min-w-150px">Jumlah Terlambat</th>
+                                            <th class="text-center min-w-200px">Tanggal Terlambat</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="fw-bold text-gray-600">
+                                        @forelse($late_employees_data['three_times_late'] as $data)
+                                        <tr>
+                                            <td class="ps-2">
+                                                <div>
+                                                    <a href="/employees/{{ $data['employee']->id }}/detail-v2" class="text-gray-800 text-hover-primary">{{ $data['employee']->name }}</a>
+                                                </div>
+                                                <span class="text-muted d-block fs-7">
+                                                    {{ $data['employee']->office->division->company->initial ?? 'NA' }}-{{ $data['employee']->office->division->initial ?? 'NA' }}-{{ $data['employee']->number }}
+                                                </span>
+                                            </td>
+                                            <td class="text-center">{{ $data['employee']->office->division->company->name ?? 'PERUSAHAAN' }}</td>
+                                            <td class="text-center">{{ $data['employee']->office->division->name ?? 'DIVISI' }}</td>
+                                            <td class="text-center">{{ $data['employee']->office->name ?? 'KANTOR' }}</td>
+                                            <td class="text-center">
+                                                <span class="badge badge-danger">{{ $data['count'] }}x</span>
+                                            </td>
+                                            <td class="text-center">
+                                                @foreach($data['dates'] as $date)
+                                                <span class="badge badge-light me-1">{{ \Carbon\Carbon::parse($date)->isoFormat('DD MMM') }}</span>
+                                                @endforeach
+                                            </td>
+                                        </tr>
+                                        @empty
+                                        <tr>
+                                            <td colspan="6" class="text-center text-muted">Tidak ada data</td>
+                                        </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Tab: Two Times Late in SP1 -->
+                        <div class="tab-pane fade" id="tab_two_times_late_sp1" role="tabpanel">
+                            <div class="table-responsive" style="max-height: 400px;">
+                                <table class="table align-middle table-row-dashed fs-7 gy-5">
+                                    <thead class="bg-light-warning">
+                                        <tr class="text-center text-gray-700 fw-bolder fs-7 text-uppercase gs-0">
+                                            <th class="text-start min-w-150px ps-2">Pegawai</th>
+                                            <th class="text-center min-w-150px">Perusahaan</th>
+                                            <th class="text-center min-w-150px">Divisi</th>
+                                            <th class="text-center min-w-150px">Kantor</th>
+                                            <th class="text-center min-w-150px">Jumlah Terlambat</th>
+                                            <th class="text-center min-w-200px">Tanggal Terlambat</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="fw-bold text-gray-600">
+                                        @forelse($late_employees_data['two_times_late_in_sp1'] as $data)
+                                        <tr>
+                                            <td class="ps-2">
+                                                <div>
+                                                    <a href="/employees/{{ $data['employee']->id }}/detail-v2" class="text-gray-800 text-hover-primary">{{ $data['employee']->name }}</a>
+                                                </div>
+                                                <span class="text-muted d-block fs-7">
+                                                    {{ $data['employee']->office->division->company->initial ?? 'NA' }}-{{ $data['employee']->office->division->initial ?? 'NA' }}-{{ $data['employee']->number }}
+                                                </span>
+                                            </td>
+                                            <td class="text-center">{{ $data['employee']->office->division->company->name ?? 'PERUSAHAAN' }}</td>
+                                            <td class="text-center">{{ $data['employee']->office->division->name ?? 'DIVISI' }}</td>
+                                            <td class="text-center">{{ $data['employee']->office->name ?? 'KANTOR' }}</td>
+                                            <td class="text-center">
+                                                <span class="badge badge-warning">{{ $data['count'] }}x</span>
+                                            </td>
+                                            <td class="text-center">
+                                                @foreach($data['dates'] as $date)
+                                                <span class="badge badge-light me-1">{{ \Carbon\Carbon::parse($date)->isoFormat('DD MMM') }}</span>
+                                                @endforeach
+                                            </td>
+                                        </tr>
+                                        @empty
+                                        <tr>
+                                            <td colspan="6" class="text-center text-muted">Tidak ada data</td>
+                                        </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Tab: One Time Late in SP2 -->
+                        <div class="tab-pane fade" id="tab_one_time_late_sp2" role="tabpanel">
+                            <div class="table-responsive" style="max-height: 400px;">
+                                <table class="table align-middle table-row-dashed fs-7 gy-5">
+                                    <thead class="bg-light-info">
+                                        <tr class="text-center text-gray-700 fw-bolder fs-7 text-uppercase gs-0">
+                                            <th class="text-start min-w-150px ps-2">Pegawai</th>
+                                            <th class="text-center min-w-150px">Perusahaan</th>
+                                            <th class="text-center min-w-150px">Divisi</th>
+                                            <th class="text-center min-w-150px">Kantor</th>
+                                            <th class="text-center min-w-150px">Jumlah Terlambat</th>
+                                            <th class="text-center min-w-200px">Tanggal Terlambat</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="fw-bold text-gray-600">
+                                        @forelse($late_employees_data['one_time_late_in_sp2'] as $data)
+                                        <tr>
+                                            <td class="ps-2">
+                                                <div>
+                                                    <a href="/employees/{{ $data['employee']->id }}/detail-v2" class="text-gray-800 text-hover-primary">{{ $data['employee']->name }}</a>
+                                                </div>
+                                                <span class="text-muted d-block fs-7">
+                                                    {{ $data['employee']->office->division->company->initial ?? 'NA' }}-{{ $data['employee']->office->division->initial ?? 'NA' }}-{{ $data['employee']->number }}
+                                                </span>
+                                            </td>
+                                            <td class="text-center">{{ $data['employee']->office->division->company->name ?? 'PERUSAHAAN' }}</td>
+                                            <td class="text-center">{{ $data['employee']->office->division->name ?? 'DIVISI' }}</td>
+                                            <td class="text-center">{{ $data['employee']->office->name ?? 'KANTOR' }}</td>
+                                            <td class="text-center">
+                                                <span class="badge badge-info">{{ $data['count'] }}x</span>
+                                            </td>
+                                            <td class="text-center">
+                                                @foreach($data['dates'] as $date)
+                                                <span class="badge badge-light me-1">{{ \Carbon\Carbon::parse($date)->isoFormat('DD MMM') }}</span>
+                                                @endforeach
+                                            </td>
+                                        </tr>
+                                        @empty
+                                        <tr>
+                                            <td colspan="6" class="text-center text-muted">Tidak ada data</td>
+                                        </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!--end::Body-->
+            </div>
+            <!--end::Tables Widget 9-->
+        </div>
+        <!--end::Col-->
+    </div>
+    <!--end::Row-->
+    @endif
+    @if(in_array('view_dashboard', $permissions))
+    <div class="row gy-5 g-xl-8 align-items-start">
+        <!--begin::Col-->
+        <div class="col-xl-12">
+            <!--begin::Tables Widget 9-->
+            <div class="card card-xl-stretch mb-5 mb-xl-8">
+                <!--begin::Header-->
+                <div class="card-header border-0 pt-5">
+                    <h3 class="card-title align-items-start flex-column">
                         <span class="card-label fw-bolder fs-3 mb-1">Perlu Tindakan</span>
                         <span class="text-muted mt-1 fw-bold fs-7">Daftar tindakan yang perlu dilakukan kepada pegawai yang hardir terlambat atau di luar area kantor</span>
                     </h3>

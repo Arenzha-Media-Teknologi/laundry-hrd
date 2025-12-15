@@ -59,11 +59,28 @@
             <!--end::Alert-->
             <div class="row align-items-end mb-6">
                 <div class="col-md-8 col-lg-4">
+
                     <div class="mb-0">
                         <label class="form-label">Pilih Tanggal</label>
                         <input class="form-control form-control-solid" placeholder="Pilih tanggal" id="date-range-picker" />
                     </div>
                 </div>
+            </div>
+            <div class="separator my-5"></div>
+            <h4 class="mb-3">Komponen Gaji Penambah</h4>
+            <div class="row mb-5">
+                <div class="col-md-8">
+                    <div class="mb-3">
+                        <div class="form-check form-check-custom form-check-primary">
+                            <input class="form-check-input" type="checkbox" v-model="model.includePresenceReward" id="includePresenceReward" />
+                            <label class="form-check-label" for="includePresenceReward">
+                                Hitung Reward Kehadiran @{{ presenceRewardDateRange }}
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row align-items-end mb-6">
                 <div class="col-md-4 col-lg-2">
                     <!-- <button class="btn btn-primary">Generate</button> -->
                     <button type="button" :data-kt-indicator="generateLoading ? 'on' : null" class="btn btn-primary w-100" :disabled="generateLoading" @click="generate">
@@ -336,14 +353,11 @@
                                 </tfoot> -->
                             </table>
                         </div>
-                        <div class="row justify-content-end">
+                        <!-- <div class="row justify-content-end">
                             <div class="col-md-6 col-lg-4">
                                 <table class="table">
                                     <tbody class="fs-5 fw-bold bg-light-success">
-                                        <!-- <tr>
-                                            <td class="ps-2 fw-normal">Total Harian</td>
-                                            <td class="text-end pe-2">Rp @{{ currencyFormat(selectedDetailSalary?.total_periods) }}</td>
-                                        </tr> -->
+                                        
                                         <tr v-for="additionalIncome in selectedDetailSalary?.additional_incomes">
                                             <td class="ps-2 fw-normal">@{{ additionalIncome?.name }}</td>
                                             <td class="text-end pe-2">Rp @{{ currencyFormat(additionalIncome?.amount || 0) }}</td>
@@ -351,7 +365,7 @@
                                     </tbody>
                                 </table>
                             </div>
-                        </div>
+                        </div> -->
                         <div>
                             <h4>Pendapatan Lainnya</h4>
                             <div class="table-responsive">
@@ -364,6 +378,11 @@
                                         </tr>
                                     </thead>
                                     <tbody>
+                                        <tr v-for="additionalIncome in selectedDetailSalary?.additional_incomes">
+                                            <td></td>
+                                            <td class="ps-2 fw-normal">@{{ additionalIncome?.name }}</td>
+                                            <td class="text-end pe-2">Rp @{{ currencyFormat(additionalIncome?.value || 0) }}</td>
+                                        </tr>
                                         <tr v-if="selectedDetailSalary.total_unredeemed_deposits > 0" class="fw-bold fs-6 text-gray-700">
                                             <td style="width: 50px;">
                                                 <div class="form-check form-check-custom form-check-primary">
@@ -377,6 +396,7 @@
                                 </table>
                             </div>
                         </div>
+                        <div class="separator separator-dashed"></div>
                         <div class="text-end py-3">
                             <span class="fw-bold fs-3">Rp @{{ currencyFormat(selectedDetailSalary?.summary?.total_incomes) }}</span>
                         </div>
@@ -395,8 +415,13 @@
                                     <tbody>
                                         <tr v-if="selectedDetailSalary.late_charge > 0" class="fw-bold fs-6 text-gray-700">
                                             <td></td>
-                                            <td>Denda keterlambatan @{{ selectedDetailSalary.total_time_late }} menit</td>
+                                            <td>Denda keterlambatan @{{ selectedDetailSalary.total_time_late }} hari</td>
                                             <td class="text-end">@{{ currencyFormat(selectedDetailSalary.late_charge) }}</td>
+                                        </tr>
+                                        <tr v-if="selectedDetailSalary.outlet_opening_late_charge > 0" class="fw-bold fs-6 text-gray-700">
+                                            <td></td>
+                                            <td>Denda keterlambatan Pembukaan Outlet @{{ selectedDetailSalary.total_outlet_opening_late }} hari</td>
+                                            <td class="text-end">@{{ currencyFormat(selectedDetailSalary.outlet_opening_late_charge) }}</td>
                                         </tr>
                                         <tr v-if="selectedDetailSalary.total_unpaid_deposits > 0" class="fw-bold fs-6 text-gray-700">
                                             <td style="width: 50px;">
@@ -472,7 +497,7 @@
                             <div class="col-md-4">
                                 <div class="d-flex justify-content-between mb-5">
                                     <h5 class="mb-0 text-gray-700">Pendapatan</h5>
-                                    <h5 class="mb-0 text-gray-800">Rp @{{ currencyFormat(totalIncomes) }}</h5>
+                                    <h5 class="mb-0 text-gray-800">Rp @{{ currencyFormat(totalGrandIncomes) }}</h5>
                                 </div>
                                 <div class="d-flex justify-content-between">
                                     <h5 class="mb-0 text-gray-700">Potongan</h5>
@@ -632,6 +657,7 @@
                     startDate: '{{ date("Y-m-d") }}',
                     endDate: '{{ date("Y-m-d") }}',
                     searchEmployeeKeyword: '',
+                    includePresenceReward: false,
                 },
                 generateLoading: false,
                 saveLoading: false,
@@ -691,6 +717,11 @@
             },
             totalIncomes() {
                 return this.totalDailyWage + this.totalOvertimePay;
+                // return this.selectedDetailSalary?.summary?.total_incomes || 0;
+            },
+            totalGrandIncomes() {
+                // return this.totalDailyWage + this.totalOvertimePay;
+                return this.selectedDetailSalary?.summary?.total_incomes || 0;
             },
             totalOtherDeductions() {
                 const self = this;
@@ -700,16 +731,30 @@
             totalDeductions() {
                 // return this.selectedDetailSalary?.summary?.total_deductions || 0;
                 const totalLoan = this.selectedDetailSalary?.total_loan || 0;
+                const totalOutletOpeningLate = this.selectedDetailSalary?.outlet_opening_late_charge || 0;
                 const totalOtherDeductions = this.totalOtherDeductions;
-                const total = totalLoan + totalOtherDeductions;
+                const totalLateCharge = this.selectedDetailSalary?.late_charge || 0;
+                const total = totalLoan + totalOtherDeductions + totalOutletOpeningLate + totalLateCharge;
 
                 return total;
             },
             takeHomePay() {
-                return this.totalIncomes - this.totalDeductions;
+                return this.totalGrandIncomes - this.totalDeductions;
             },
             totalAllTakeHomePay() {
                 return this.salaries.map(salary => Number(salary.summary.take_home_pay)).reduce((acc, cur) => acc + cur, 0);
+            },
+            presenceRewardDateRange() {
+                if (!this.model.endDate) {
+                    return '(tanggal awal bulan - tanggal akhir bulan)';
+                }
+
+                const endDate = moment(this.model.endDate);
+                const previousMonth = moment(endDate).subtract(1, 'month');
+                const startOfMonth = moment(previousMonth).startOf('month');
+                const endOfMonth = moment(previousMonth).endOf('month');
+
+                return `(${startOfMonth.format('DD/MM/YYYY')} - ${endOfMonth.format('DD/MM/YYYY')})`;
             }
         },
         methods: {
@@ -821,6 +866,7 @@
                 try {
                     const startDate = this.model.startDate;
                     const endDate = this.model.endDate;
+                    const includePresenceReward = this.model.includePresenceReward ? 1 : 0;
 
                     if (!startDate || !endDate) {
                         Swal.fire({
@@ -838,7 +884,7 @@
 
                     self.generateLoading = true;
 
-                    const response = await axios.get(`/daily-salaries/action/generate-aerplus?start_date=${startDate}&end_date=${endDate}`);
+                    const response = await axios.get(`/daily-salaries/action/generate-aerplus?start_date=${startDate}&end_date=${endDate}&include_presence_reward=${includePresenceReward}`);
 
                     if (response) {
                         // console.log(response);

@@ -331,7 +331,7 @@
                                         <!--begin::Name-->
                                         <div class="d-flex align-items-top justify-content-between mb-2">
                                             <div class="d-flex align-items-center mb-2">
-                                                <a href="/employees/{{ $employee->id }}/detail-v2" class="text-gray-900 text-hover-primary fs-3 fw-bolder me-1">{{ $employee->name }}</a>
+                                                <a href="/employees/{{ $employee->id }}/detail-v2" class="text-gray-900 text-hover-primary fs-3 fw-bolder me-1">{{ $employee->name }}@if($employee->alias) <span class="text-muted">({{ $employee->alias }})</span>@endif</a>
 
                                                 @if($employee->active == 1)
                                                 <!--begin::Svg Icon | path: icons/duotune/general/gen026.svg-->

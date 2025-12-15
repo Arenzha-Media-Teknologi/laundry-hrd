@@ -142,7 +142,7 @@
         <div class="card-body p-9">
             <div class="d-flex mb-7">
                 <div class="me-10">
-                    <i class="bi bi-person-fill me-1"></i> <span class="fw-bold fs-6 text-gray-800">{{ $employee->name }} ({{ $employee->gender == 'male' ? 'Laki-laki' : 'Perempuan' }})</span>
+                    <i class="bi bi-person-fill me-1"></i> <span class="fw-bold fs-6 text-gray-800">{{ $employee->name }}@if($employee->alias) ({{ $employee->alias }})@endif ({{ $employee->gender == 'male' ? 'Laki-laki' : 'Perempuan' }})</span>
                 </div>
                 <div>
                     <i class="bi bi-person-video me-1"></i> <span class="fw-bold fs-6 text-gray-800">{{ $employee->start_work_date }}&nbsp;-&nbsp;<span class="text-capitalize">Karyawan {{ $employee->activeCareer->status ?? '' }}</span></span>

@@ -359,6 +359,9 @@ class LeaveController extends Controller
             $employees = Employee::all()->map(function ($employee) use ($startDate, $endDate) {
                 // Leave remainings
                 $leaveQuota = 12;
+                if ($employee->type == "non_staff") {
+                    $leaveQuota = 3;
+                }
                 $lengthOfWorking = Carbon::parse($employee->start_work_date)->diffInYears($startDate);
                 if ($lengthOfWorking < 1) {
                     $leaveQuota = 0;

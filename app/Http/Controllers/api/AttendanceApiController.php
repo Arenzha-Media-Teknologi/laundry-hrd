@@ -7,6 +7,7 @@ use App\Models\Attendance;
 use App\Models\AttendanceQuote;
 use App\Models\Employee;
 use App\Models\LeaveApplication;
+use App\Models\OutletOpening;
 use App\Models\SickApplication;
 use App\Models\WorkingPattern;
 use App\Models\WorkScheduleItem;
@@ -566,6 +567,19 @@ class AttendanceApiController extends Controller
 
             $attendance->save();
 
+            if ($employee->office_id) {
+                $outletOpening = OutletOpening::where('office_id', $employee->office_id)
+                    ->where('date', $attendanceDate)
+                    ->where('approval_status', 'approved')
+                    ->where('timeliness_status', 'late')
+                    ->first();
+
+                if ($outletOpening) {
+                    $attendance->outlet_opening_late = $outletOpening->late_amount;
+                    $attendance->save();
+                }
+            }
+
             $quotes = $this->getRandomQuotes();
 
             return response()->json([
@@ -729,6 +743,19 @@ class AttendanceApiController extends Controller
             $attendance->clock_in_attachment = $urlPath;
             $attendance->working_pattern_id = $workingPatternId;
             $attendance->save();
+
+            if ($employee->office_id) {
+                $outletOpening = OutletOpening::where('office_id', $employee->office_id)
+                    ->where('date', $attendanceDate)
+                    ->where('approval_status', 'approved')
+                    ->where('timeliness_status', 'late')
+                    ->first();
+
+                if ($outletOpening) {
+                    $attendance->outlet_opening_late = $outletOpening->late_amount;
+                    $attendance->save();
+                }
+            }
 
             $quotes = $this->getRandomQuotes();
 

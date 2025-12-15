@@ -104,12 +104,20 @@
                                     <input type="text" v-model="model.name" class="form-control form-control-sm mb-2" placeholder="Masukkan nama pegawai" />
                                 </div>
                             </div>
-                            <div class="row align-items-center">
+                            <div class="row align-items-center mb-5">
                                 <div class="col-md-4">
 
                                 </div>
                                 <div class="col-md-8">
                                     <div class="text-muted fs-7">Nama lengkap sesuai KTP</div>
+                                </div>
+                            </div>
+                            <div class="row align-items-center">
+                                <div class="col-md-4">
+                                    <label class="form-label fs-7">Nama Panggilan:</label>
+                                </div>
+                                <div class="col-md-8">
+                                    <input type="text" v-model="model.alias" class="form-control form-control-sm mb-2" placeholder="Masukkan nama panggilan" />
                                 </div>
                             </div>
                         </div>
@@ -939,6 +947,7 @@
                 getResourcesLoading: false,
                 model: {
                     name: '{{ $employee->name }}',
+                    alias: '{{ $employee->alias ?? "" }}',
                     gender: '{{ $employee->gender }}',
                     placeOfBirth: '{{ $employee->place_of_birth }}',
                     dateOfBirth: '{{ $employee->date_of_birth }}',
@@ -1094,6 +1103,7 @@
                 try {
                     const {
                         name,
+                        alias,
                         gender,
                         placeOfBirth,
                         dateOfBirth,
@@ -1136,6 +1146,7 @@
 
                     const requestBody = {
                         name,
+                        alias,
                         number: employeeNumber,
                         gender,
                         place_of_birth: placeOfBirth,

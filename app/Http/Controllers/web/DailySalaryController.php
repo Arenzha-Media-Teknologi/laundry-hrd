@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\web;
 
 use App\Exports\dailysalaries\AerplusDailySalaryExport;
+use App\Exports\dailysalaries\AerplusDailySalaryByWorkScheduleExport;
 use App\Exports\dailysalaries\AerplusDailySalarySummaryExport;
 use App\Exports\dailysalaries\MagentaDailySalaryExport;
 use App\Http\Controllers\Controller;
@@ -522,6 +523,7 @@ class DailySalaryController extends Controller
     {
         $startDate = $request->query('start_date');
         $endDate = $request->query('end_date');
+        $includePresenceReward = $request->query('include_presence_reward', 0);
 
         if ($startDate == null || $endDate == null) {
             return response()->json([
@@ -529,12 +531,29 @@ class DailySalaryController extends Controller
             ], 400);
         }
 
+        // Calculate previous month range for presence reward
+        $previousMonthStartDate = null;
+        $previousMonthEndDate = null;
+        if ($includePresenceReward == 1) {
+            $endDateCarbon = Carbon::parse($endDate);
+            $previousMonth = $endDateCarbon->copy()->subMonth();
+            $previousMonthStartDate = $previousMonth->startOfMonth()->format('Y-m-d');
+            $previousMonthEndDate = $previousMonth->endOfMonth()->format('Y-m-d');
+            // $previousMonthStartDate = "2025-12-11";
+            // $previousMonthEndDate = "2025-12-11";
+        }
+
         try {
             $employees = Employee::whereDoesntHave('dailySalaries', function ($q) use ($startDate, $endDate) {
                 $q->where('start_date', $startDate)->where('end_date', $endDate)->where('type', 'aerplus');
             })->with([
-                'attendances' => function ($q) use ($startDate, $endDate) {
-                    $q->whereBetween('date', [$startDate, $endDate])->orderBy('id', 'desc');
+                'attendances' => function ($q) use ($startDate, $endDate, $includePresenceReward, $previousMonthStartDate) {
+                    $attendanceDateStart = $startDate;
+                    if ($includePresenceReward == 1 && $previousMonthStartDate) {
+                        // Load attendances for both current period and previous month
+                        $attendanceDateStart = $previousMonthStartDate;
+                    }
+                    $q->whereBetween('date', [$attendanceDateStart, $endDate])->orderBy('id', 'desc');
                 },
                 'activeWorkingPatterns' => function ($q) {
                     $q->with(['items']);
@@ -550,8 +569,13 @@ class DailySalaryController extends Controller
                         // ->whereBetween('payment_date', [$startDate, $endDate]);
                     }]);
                 },
-                'workScheduleItems' => function ($q) use ($startDate, $endDate) {
-                    $q->where('date', '>=', $startDate)->where('date', '<=', $endDate);
+                'workScheduleItems' => function ($q) use ($startDate, $endDate, $includePresenceReward, $previousMonthStartDate) {
+                    $workScheduleDateStart = $startDate;
+                    if ($includePresenceReward == 1 && $previousMonthStartDate) {
+                        // Load workScheduleItems for both current period and previous month
+                        $workScheduleDateStart = $previousMonthStartDate;
+                    }
+                    $q->where('date', '>=', $workScheduleDateStart)->where('date', '<=', $endDate);
                 }
             ])->where('aerplus_daily_salary', 1)->where('active', 1)->get();
 
@@ -571,7 +595,7 @@ class DailySalaryController extends Controller
                 ];
             });
 
-            $salaries = collect($employees)->map(function ($employee) use ($periodDates, $eventCalendars, $numberOfDays, $officeNamesById) {
+            $salaries = collect($employees)->map(function ($employee) use ($periodDates, $eventCalendars, $numberOfDays, $officeNamesById, $includePresenceReward, $previousMonthStartDate, $previousMonthEndDate) {
                 $attendances = $employee->attendances;
                 $workingPatterns = $employee->activeWorkingPatterns;
                 $activeWorkingPattern = collect($workingPatterns)->first();
@@ -683,7 +707,11 @@ class DailySalaryController extends Controller
                             // if ($employee->aerplus_overtime == 1) {
                             //     $overtimePay = $employeeWage['overtime'] * floor($newestAttendance['overtime'] / 60);
                             // }
-                            $overtimePay = $employeeWage['overtime'] * floor($newestAttendance['overtime'] / 60);
+                            $totalOvertimeHour = floor($newestAttendance['overtime'] / 60);
+                            if ($totalOvertimeHour > 2) {
+                                $totalOvertimeHour = 2;
+                            }
+                            $overtimePay = $employeeWage['overtime'] * $totalOvertimeHour;
                             // $overtimePay = 99999;
                             //! OVERTIME CHANGES
 
@@ -707,7 +735,10 @@ class DailySalaryController extends Controller
 
                             $attendance['time_late'] = $timeLate;
 
-                            $totalTimeLate += $timeLate;
+                            // $totalTimeLate += $timeLate;
+                            if ($timeLate > 0) {
+                                $totalTimeLate += 1;
+                            }
                         }
                     }
 
@@ -730,14 +761,18 @@ class DailySalaryController extends Controller
                     ];
                 })->all();
 
-                $lateCharge = 0;
-                if ($totalTimeLate > 0 && $totalTimeLate <= 60) {
-                    $lateCharge = $employeeWage['daily'] * (50 / 100);
-                } else if ($totalTimeLate > 60) {
-                    $lateCharge = $employeeWage['daily'];
+                // $lateCharge = 0;
+                // if ($totalTimeLate > 0 && $totalTimeLate <= 60) {
+                //     $lateCharge = $employeeWage['daily'] * (50 / 100);
+                // } else if ($totalTimeLate > 60) {
+                //     $lateCharge = $employeeWage['daily'];
+                // }
+                $LATE_FEE_PER_DAY = 20000;
+                if ($employee->type = "staff") {
+                    $LATE_FEE_PER_DAY = 30000;
                 }
 
-                $lateCharge = 0;
+                $lateCharge = $totalTimeLate * $LATE_FEE_PER_DAY;
 
                 /**
                  * Deposit
@@ -787,12 +822,90 @@ class DailySalaryController extends Controller
                     ]);
                 }
 
+                // Outlet Opening Late
+                $totalOutletOpeningLate = collect($attendances)->where('outlet_opening_late', '>', 0)->count();
+                $outletOpeningLateFeeByJobTitleId = [
+                    '2' => 50000,
+                    '3' => 100000,
+                    '6' => 50000,
+                ];
+
+                $outletOpeningLateCharge = 0;
+                $OUTLET_OPENING_LATE_CHARGE_PER_DAY = 20000;
+                if ($totalOutletOpeningLate > 0) {
+                    $jobTitleId = $employee->activeCareer->jobTitle->id ?? null;
+                    $DEFAULT_FEE = 0;
+                    // $outletOpeningLateCharge = ($outletOpeningLateFeeByJobTitleId[$jobTitleId] ?? $DEFAULT_FEE) * $totalOutletOpeningLate;
+                    $outletOpeningLateCharge = $OUTLET_OPENING_LATE_CHARGE_PER_DAY * $totalOutletOpeningLate;
+                }
+                // End: Outlet Opening Late
+
                 $totalPeriods = collect($periods)->sum('total');
-                $totalAdditionalIncomes = collect($additionalIncomes)->sum('value');
+
+                /**
+                 * Presence Reward Calculation
+                 */
+                $presenceRewardAmount = 0;
+                if ($includePresenceReward == 1 && $previousMonthStartDate && $previousMonthEndDate) {
+                    // Use already loaded attendances and filter for previous month
+                    $previousMonthAttendances = collect($employee->attendances)
+                        ->filter(function ($attendance) use ($previousMonthStartDate, $previousMonthEndDate) {
+                            return $attendance->date >= $previousMonthStartDate && $attendance->date <= $previousMonthEndDate;
+                        });
+
+                    // Use already loaded workScheduleItems and filter for previous month
+                    $previousMonthWorkScheduleItems = collect($employee->workScheduleItems)
+                        ->filter(function ($workScheduleItem) use ($previousMonthStartDate, $previousMonthEndDate) {
+                            return $workScheduleItem->date >= $previousMonthStartDate && $workScheduleItem->date <= $previousMonthEndDate;
+                        });
+
+                    // Check if employee is diligent
+                    // Only check dates that have work schedule items
+                    // If no work schedule items, employee is not eligible for reward
+                    $isDiligent = $previousMonthWorkScheduleItems->count() > 0;
+                    foreach ($previousMonthWorkScheduleItems as $workScheduleItem) {
+                        $date = $workScheduleItem->date;
+
+                        // If is_off = 1, no attendance required
+                        if ($workScheduleItem->is_off == 1) {
+                            continue;
+                        }
+
+                        // If is_off != 1, must have attendance with status "hadir" and no late
+                        $attendance = $previousMonthAttendances->where('date', $date)->first();
+                        if (!$attendance) {
+                            $isDiligent = false;
+                            break;
+                        }
+
+                        if ($attendance->status != 'hadir') {
+                            $isDiligent = false;
+                            break;
+                        }
+
+                        if ($attendance->time_late > 0) {
+                            $isDiligent = false;
+                            break;
+                        }
+                    }
+
+                    if ($isDiligent) {
+                        $presenceRewardAmount = 50000;
+                    }
+                }
+
+                if ($presenceRewardAmount > 0) {
+                    array_push($additionalIncomes, [
+                        'name' => 'Insentif Kehadiran',
+                        'type' => 'insentif_kehadiran',
+                        'value' => $presenceRewardAmount,
+                    ]);
+                }
 
                 // Summary
+                $totalAdditionalIncomes = collect($additionalIncomes)->sum('value');
                 $totalIncomes = $totalPeriods + $totalAdditionalIncomes;
-                $totalDeductions = $lateCharge + $totalUnpaidDeposit + $totalLoan;
+                $totalDeductions = $lateCharge + $totalUnpaidDeposit + $totalLoan + $outletOpeningLateCharge;
                 $takeHomePay = $totalIncomes - $totalDeductions;
 
                 $allLoanItems = collect($employee->loans)->flatMap(function ($loan) {
@@ -808,6 +921,8 @@ class DailySalaryController extends Controller
                     'additional_incomes' => $additionalIncomes,
                     'total_time_late' => $totalTimeLate,
                     'late_charge' => $lateCharge,
+                    'outlet_opening_late_charge' => $outletOpeningLateCharge,
+                    'total_outlet_opening_late' => $totalOutletOpeningLate,
                     // 'late_charge' => 0,
                     'number_of_days' => $numberOfDays + 1,
                     'total_unpaid_deposits' => $totalUnpaidDeposit,
@@ -825,6 +940,7 @@ class DailySalaryController extends Controller
                     'list_unredeemed_deposits' => $unredeemedDeposit->values()->all(),
                     'list_loans' => $loanItems->values()->all(),
                     'other_deductions' => $otherDeductions,
+                    'presence_reward_amount' => $presenceRewardAmount,
                     'summary' => [
                         'total_incomes' => $totalIncomes,
                         'total_deductions' => $totalDeductions,
@@ -1184,6 +1300,243 @@ class DailySalaryController extends Controller
             //     'message' => 'OK',
             //     'data' => $dailySalaries,
             // ]);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'message' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Export aerplus report by work schedule (grouped by office_id from incomes)
+     */
+    public function exportAerplusByWorkScheduleReport(Request $request)
+    {
+        try {
+            $startDate = $request->query('start_date');
+            $endDate = $request->query('end_date');
+
+            if ($startDate == null && $endDate == null) {
+                throw new Error('params "start_date" and "end_date" are required');
+            }
+
+            $dailySalaries = DailySalary::with(['office', 'employee' => function ($employeeQuery) {
+                $employeeQuery->with(['office', 'bankAccounts']);
+            }])
+                ->where('type', 'aerplus')
+                ->where('start_date', $startDate)
+                ->where('end_date', $endDate)
+                ->get();
+
+            // Group employees by office_id from incomes
+            $employeesByOffice = [];
+
+            foreach ($dailySalaries as $dailySalary) {
+                $incomes = json_decode($dailySalary->incomes ?? "[]", true);
+                $additionalIncomes = json_decode($dailySalary->additional_incomes ?? "[]", true);
+                $deductions = json_decode($dailySalary->deductions ?? "[]", true);
+
+                // Get employee info
+                $employee = $dailySalary->employee;
+                if ($employee === null) {
+                    continue;
+                }
+
+                $employeeName = $employee->name ?? '';
+                $bankAccounts = $employee->bankAccounts ?? [];
+                $defaultBankAccount = collect($bankAccounts)->first();
+                $bankAccountOwner = $defaultBankAccount->account_owner ?? '';
+                $bankAccountNumber = $defaultBankAccount->account_number ?? '';
+
+                // Get original office (from daily_salary.office_id)
+                $originalOfficeId = $dailySalary->office_id;
+                $originalOfficeName = null;
+                if ($dailySalary->office !== null) {
+                    $originalOfficeName = $dailySalary->office->name;
+                } else if ($employee->office !== null) {
+                    $originalOfficeId = $employee->office->id;
+                    $originalOfficeName = $employee->office->name;
+                }
+
+                // Group incomes by office_id (for daily salary distribution)
+                $incomesByOffice = collect($incomes)->groupBy('office_id');
+
+                // Process each office group (only for daily salary)
+                foreach ($incomesByOffice as $officeId => $officeIncomes) {
+                    if ($officeId === null) {
+                        continue;
+                    }
+
+                    // Get office name from first income item
+                    $firstIncome = collect($officeIncomes)->first();
+                    $officeName = $firstIncome['office_name'] ?? 'Unknown Office';
+
+                    // Calculate totals for this office (only daily salary, no additional_incomes or deductions)
+                    $totalDailyForOffice = collect($officeIncomes)->sum('total');
+
+                    // Initialize office array if not exists
+                    if (!isset($employeesByOffice[$officeId])) {
+                        $employeesByOffice[$officeId] = [
+                            'office_id' => $officeId,
+                            'office_name' => $officeName,
+                            'employees' => [],
+                        ];
+                    }
+
+                    // Check if employee already exists in this office
+                    $existingEmployeeIndex = null;
+                    foreach ($employeesByOffice[$officeId]['employees'] as $index => $emp) {
+                        if ($emp['employee_id'] === $employee->id) {
+                            $existingEmployeeIndex = $index;
+                            break;
+                        }
+                    }
+
+                    if ($existingEmployeeIndex !== null) {
+                        // Update existing employee data (only daily salary)
+                        $existingEmployee = &$employeesByOffice[$officeId]['employees'][$existingEmployeeIndex];
+                        $existingEmployee['total_daily'] += $totalDailyForOffice;
+                        $existingEmployee['take_home_pay'] = $existingEmployee['total_daily'] +
+                            collect(json_decode($existingEmployee['additional_incomes'] ?? "[]", true))->sum('value') -
+                            collect(json_decode($existingEmployee['deductions'] ?? "[]", true))->sum('value');
+                    } else {
+                        // Add new employee entry for this office (only daily salary, no additional_incomes or deductions yet)
+                        $employeesByOffice[$officeId]['employees'][] = [
+                            'employee_id' => $employee->id,
+                            'name' => $employeeName,
+                            'bank_account_owner' => $bankAccountOwner,
+                            'bank_account_number' => $bankAccountNumber,
+                            'total_daily' => $totalDailyForOffice,
+                            'allowance' => 0,
+                            'redeem_deposit' => 0,
+                            'late_fee' => 0,
+                            'deposit' => 0,
+                            'loan' => 0,
+                            'take_home_pay' => $totalDailyForOffice,
+                            'additional_incomes' => json_encode([]),
+                            'deductions' => json_encode([]),
+                        ];
+                    }
+                }
+
+                // Add additional_incomes and deductions to original office (daily_salary.office_id)
+                if ($originalOfficeId !== null) {
+                    // Get original office name
+                    if ($originalOfficeName === null) {
+                        $originalOffice = Office::find($originalOfficeId);
+                        $originalOfficeName = $originalOffice ? $originalOffice->name : 'Unknown Office';
+                    }
+
+                    // Initialize original office if not exists
+                    if (!isset($employeesByOffice[$originalOfficeId])) {
+                        $employeesByOffice[$originalOfficeId] = [
+                            'office_id' => $originalOfficeId,
+                            'office_name' => $originalOfficeName,
+                            'employees' => [],
+                        ];
+                    }
+
+                    // Check if employee already exists in original office
+                    $existingEmployeeIndex = null;
+                    foreach ($employeesByOffice[$originalOfficeId]['employees'] as $index => $emp) {
+                        if ($emp['employee_id'] === $employee->id) {
+                            $existingEmployeeIndex = $index;
+                            break;
+                        }
+                    }
+
+                    // Calculate totals for additional_incomes and deductions
+                    $totalAdditionalIncomes = collect($additionalIncomes)->sum('value');
+                    $totalDeductions = collect($deductions)->sum('value');
+
+                    // Calculate specific types for display
+                    $allowance = collect($additionalIncomes)->filter(function ($item) {
+                        return str_starts_with($item['type'] ?? '', 'tunjangan');
+                    })->sum('value');
+                    $redeemDeposit = collect($additionalIncomes)->where('type', 'redeem_deposit')->sum('value');
+                    $lateFee = collect($deductions)->where('type', 'late_fee')->sum('value');
+                    $deposit = collect($deductions)->where('type', 'deposit')->sum('value');
+                    $loan = collect($deductions)->where('type', 'loan')->sum('value');
+
+                    if ($existingEmployeeIndex !== null) {
+                        // Update existing employee data in original office
+                        $existingEmployee = &$employeesByOffice[$originalOfficeId]['employees'][$existingEmployeeIndex];
+
+                        // Add additional_incomes and deductions
+                        $existingEmployee['allowance'] += $allowance;
+                        $existingEmployee['redeem_deposit'] += $redeemDeposit;
+                        $existingEmployee['late_fee'] += $lateFee;
+                        $existingEmployee['deposit'] += $deposit;
+                        $existingEmployee['loan'] += $loan;
+
+                        // Update take home pay
+                        $existingEmployee['take_home_pay'] = $existingEmployee['total_daily'] + $totalAdditionalIncomes - $totalDeductions;
+
+                        // Merge additional_incomes
+                        $existingAdditionalIncomes = json_decode($existingEmployee['additional_incomes'] ?? "[]", true);
+                        foreach ($additionalIncomes as $additionalIncome) {
+                            $existingIndex = collect($existingAdditionalIncomes)->search(function ($item) use ($additionalIncome) {
+                                return ($item['type'] ?? '') === ($additionalIncome['type'] ?? '');
+                            });
+                            if ($existingIndex !== false) {
+                                $existingAdditionalIncomes[$existingIndex]['value'] = ($existingAdditionalIncomes[$existingIndex]['value'] ?? 0) + ($additionalIncome['value'] ?? 0);
+                            } else {
+                                $existingAdditionalIncomes[] = $additionalIncome;
+                            }
+                        }
+
+                        // Merge deductions
+                        $existingDeductions = json_decode($existingEmployee['deductions'] ?? "[]", true);
+                        foreach ($deductions as $deduction) {
+                            $existingIndex = collect($existingDeductions)->search(function ($item) use ($deduction) {
+                                return ($item['type'] ?? '') === ($deduction['type'] ?? '');
+                            });
+                            if ($existingIndex !== false) {
+                                $existingDeductions[$existingIndex]['value'] = ($existingDeductions[$existingIndex]['value'] ?? 0) + ($deduction['value'] ?? 0);
+                            } else {
+                                $existingDeductions[] = $deduction;
+                            }
+                        }
+
+                        $existingEmployee['additional_incomes'] = json_encode($existingAdditionalIncomes);
+                        $existingEmployee['deductions'] = json_encode($existingDeductions);
+                    } else {
+                        // Add new employee entry in original office (with additional_incomes and deductions)
+                        $employeesByOffice[$originalOfficeId]['employees'][] = [
+                            'employee_id' => $employee->id,
+                            'name' => $employeeName,
+                            'bank_account_owner' => $bankAccountOwner,
+                            'bank_account_number' => $bankAccountNumber,
+                            'total_daily' => 0, // Daily salary is already distributed to other offices
+                            'allowance' => $allowance,
+                            'redeem_deposit' => $redeemDeposit,
+                            'late_fee' => $lateFee,
+                            'deposit' => $deposit,
+                            'loan' => $loan,
+                            'take_home_pay' => $totalAdditionalIncomes - $totalDeductions,
+                            'additional_incomes' => json_encode($additionalIncomes),
+                            'deductions' => json_encode($deductions),
+                        ];
+                    }
+                }
+            }
+
+            // Convert to array format similar to exportAerplusReport
+            $dailySalariesByOffice = collect($employeesByOffice)
+                ->sortBy('office_id')
+                ->map(function ($officeData) {
+                    return [
+                        'office' => $officeData['office_name'],
+                        'employees' => $officeData['employees'],
+                    ];
+                })
+                ->values()
+                ->all();
+
+            return Excel::download(
+                new AerplusDailySalaryByWorkScheduleExport($startDate, $endDate, $dailySalariesByOffice),
+                'Rekapitulasi Gaji Harian By Work Schedule ' . $startDate . ' - ' . $endDate . '.xlsx'
+            );
         } catch (\Throwable $th) {
             return response()->json([
                 'message' => $th->getMessage(),

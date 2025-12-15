@@ -56,9 +56,11 @@ use App\Http\Controllers\web\AttendancePeriodController;
 use App\Http\Controllers\web\AttendanceQuotesController;
 use App\Http\Controllers\web\CheckInController;
 use App\Http\Controllers\web\IssueSettlementController;
+use App\Http\Controllers\web\OutletOpeningController;
 use App\Http\Controllers\web\OvertimeApplicationController;
 use App\Http\Controllers\web\OvertimeApplicationV2Controller;
 use App\Http\Controllers\web\PayrollBcaEmailLogController;
+use App\Http\Controllers\web\WarningLetterController;
 use App\Http\Controllers\web\WorkScheduleController;
 use App\Http\Controllers\web\WorkScheduleWorkingPatternController;
 
@@ -271,6 +273,7 @@ Route::middleware(['auth'])->group(function () {
         // Route::delete('/action/bulk-delete-aerplus', 'bulkDestroyAerplus');
         Route::prefix('/export')->group(function () {
             Route::get('/aerplus-report', 'exportAerplusReport');
+            Route::get('/aerplus-by-work-schedule-report', 'exportAerplusByWorkScheduleReport');
             Route::get('/aerplus-summary-report', 'exportAerplusSummaryReport');
             Route::get('/magenta-report', 'exportMagentaReport');
         });
@@ -596,6 +599,20 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/{id}', 'destroy');
     });
 
+    // Warning Letter
+    Route::controller(WarningLetterController::class)->prefix('warning-letters')->group(function () {
+        Route::get('/', 'index');
+        Route::get('/create', 'create');
+        Route::get('/{id}/detail', 'show');
+        Route::get('/{id}/edit', 'edit');
+        Route::get('/{id}/print', 'print');
+        Route::post('/', 'store');
+        Route::post('/{id}', 'update');
+        Route::delete('/{id}', 'destroy');
+        Route::delete('/attachments/{id}', 'deleteAttachment');
+        Route::get('/attachments/{id}/download', 'downloadAttachment');
+    });
+
     // Work Schedule
     Route::controller(WorkScheduleController::class)->prefix('work-schedules')->group(function () {
         Route::get('/', 'index');
@@ -609,6 +626,19 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/store', 'store');
         Route::post('/{id}/update', 'update');
         Route::delete('/{id}', 'destroy');
+    });
+
+    // Outlet Opening
+    Route::controller(OutletOpeningController::class)->prefix('outlet-openings')->group(function () {
+        Route::get('/', 'index');
+        Route::get('/create', 'create');
+        Route::post('/', 'store');
+        Route::get('/datatable', 'indexData');
+        Route::get('/{id}/edit', 'edit');
+        Route::put('/{id}', 'update');
+        Route::delete('/{id}', 'destroy');
+        Route::post('/{id}/approve', 'approve');
+        Route::post('/{id}/reject', 'reject');
     });
 });
 // Credential Group

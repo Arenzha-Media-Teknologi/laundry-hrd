@@ -260,4 +260,12 @@ class Employee extends Model
     {
         return $this->hasMany(WorkScheduleItem::class);
     }
+
+    /**
+     * Warning Letter
+     */
+    public function warningLetters(): HasMany
+    {
+        return $this->hasMany(WarningLetter::class);
+    }
 }

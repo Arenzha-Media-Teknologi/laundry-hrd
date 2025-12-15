@@ -148,6 +148,11 @@ class CredentialGroupController extends Controller
                     'value' => 'work_schedule',
                     'items' => ['view', 'add', 'edit', 'delete'],
                 ],
+                [
+                    'name' => 'Pembukaan Outlet',
+                    'value' => 'outlet_opening',
+                    'items' => ['view', 'add', 'edit', 'delete'],
+                ],
             ],
         ],
         [
@@ -206,6 +211,16 @@ class CredentialGroupController extends Controller
                 [
                     'name' => 'Deposit',
                     'value' => 'deposit',
+                    'items' => ['view', 'add', 'edit', 'delete'],
+                ],
+            ],
+        ],
+        [
+            'header' => 'Surat Peringatan',
+            'subheaders' => [ // Pegawai
+                [
+                    'name' => 'Surat Peringatan',
+                    'value' => 'warning_letter',
                     'items' => ['view', 'add', 'edit', 'delete'],
                 ],
             ],

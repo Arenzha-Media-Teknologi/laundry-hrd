@@ -74,6 +74,7 @@
                                     <span>Rekapitulasi</span>
                                 </button>
                                 <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="/daily-salaries/export/aerplus-by-work-schedule-report?start_date={{ $startDate }}&end_date={{ $endDate }}" target="_blank">Detail (Jadwal Kerja)</a></li>
                                     <li><a class="dropdown-item" href="/daily-salaries/export/aerplus-report?start_date={{ $startDate }}&end_date={{ $endDate }}" target="_blank">Detail</a></li>
                                     <li><a class="dropdown-item" href="/daily-salaries/export/aerplus-summary-report?start_date={{ $startDate }}&end_date={{ $endDate }}" target="_blank">Summary</a></li>
                                 </ul>

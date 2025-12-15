@@ -568,7 +568,8 @@ class PayrollController extends Controller
                 if ($employee->type == "non_staff") {
                     $presenceIncentiveAmount = $employeeWage['daily'] * 2;
                 } else if ($employee->type == "staff") {
-                    $presenceIncentiveAmount = 250000;
+                    // $presenceIncentiveAmount = 250000;
+                    $presenceIncentiveAmount = 100000;
                 }
                 $incomes = collect($incomes)->push([
                     'name' => 'Tunjangan Kehadiran',
@@ -2198,7 +2199,8 @@ class PayrollController extends Controller
             ->all();
 
         $additionalSalaryComponentsByOfficeId = collect($dailySalaries)->groupBy(function ($dailySalary) {
-            return $dailySalary->employee->office->id ?? 0;
+            // return $dailySalary->employee->office->id ?? 0;
+            return $dailySalary->office_id ?? 0;
         })->map(function ($dailySalaries) {
             $totalAllRedeemDeposit = 0;
             $totalAllDeposit = 0;

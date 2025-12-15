@@ -168,7 +168,8 @@ $permissions = json_decode($groupPermissions);
                 $isWorkingPatternsRoute = request()->is('working-patterns*');
                 $isOvertimeApplicationRoute = request()->is('overtime-applications-v2*');
                 $isWorkScheduleRoute = request()->is('work-schedules*');
-                $isAttendanceRouteGroup = $isAttendancesRoute || $isTimeOffsRoute || $isWorkingPatternsRoute || $isLeavesRoute || $isImportAttendancesRoute || $isOvertimeApplicationRoute || $isWorkScheduleRoute;
+                $isOutletOpeningRoute = request()->is('outlet-openings*');
+                $isAttendanceRouteGroup = $isAttendancesRoute || $isTimeOffsRoute || $isWorkingPatternsRoute || $isLeavesRoute || $isImportAttendancesRoute || $isOvertimeApplicationRoute || $isWorkScheduleRoute || $isOutletOpeningRoute;
 
                 $canViewTimeOff = Auth::user()->can('view', App\Models\SickApplication::class) || Auth::user()->can('view', App\Models\LeaveApplication::class);
 
@@ -262,6 +263,16 @@ $permissions = json_decode($groupPermissions);
                                     <span class="bullet bullet-dot"></span>
                                 </span>
                                 <span class="menu-title">Jadwal Kerja</span>
+                            </a>
+                        </div>
+                        @endif
+                        @if(in_array('view_outlet_opening', $permissions))
+                        <div class="menu-item">
+                            <a class="menu-link <?= $isOutletOpeningRoute ? 'active' : '' ?>" href="/outlet-openings">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Pembukaan Outlet</span>
                             </a>
                         </div>
                         @endif
@@ -456,6 +467,29 @@ $permissions = json_decode($groupPermissions);
                 </div>
                 @endif
                 <!-- end:pinjaman -->
+                <!-- begin:surat peringatan -->
+                <?php
+                $isWarningLetterRoute = request()->is('warning-letters*');
+                $isWarningLetterRouteGroup = $isWarningLetterRoute;
+                ?>
+                @if(in_array('view_warning_letter', $permissions))
+                <div class="menu-item">
+                    <a class="menu-link <?= $isWarningLetterRoute ? 'active' : '' ?>" href="/warning-letters">
+                        <span class="menu-icon">
+                            <!--begin::Svg Icon | path: icons/duotune/general/gen025.svg-->
+                            <span class="svg-icon svg-icon-2">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M6 8.725C6 8.125 6.4 7.725 7 7.725H14L18 11.725V12.925L22 9.725L12.6 2.225C12.2 1.925 11.7 1.925 11.4 2.225L2 9.725L6 12.925V8.725Z" fill="currentColor" />
+                                    <path opacity="0.3" d="M22 9.72498V20.725C22 21.325 21.6 21.725 21 21.725H3C2.4 21.725 2 21.325 2 20.725V9.72498L11.4 17.225C11.8 17.525 12.3 17.525 12.6 17.225L22 9.72498ZM15 11.725H18L14 7.72498V10.725C14 11.325 14.4 11.725 15 11.725Z" fill="currentColor" />
+                                </svg>
+                            </span>
+                            <!--end::Svg Icon-->
+                        </span>
+                        <span class="menu-title">Surat Peringatan</span>
+                    </a>
+                </div>
+                @endif
+                <!-- end:surat peringatan -->
                 <!-- begin:insurance -->
                 <?php
                 $isInsuranceRoute = request()->is('insurance*');

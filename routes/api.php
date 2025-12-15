@@ -11,6 +11,7 @@ use App\Http\Controllers\api\InspectionApiController;
 use App\Http\Controllers\api\LeaveApplicationApiController;
 use App\Http\Controllers\api\LeaveCategoryApiController;
 use App\Http\Controllers\api\OfficeApiController;
+use App\Http\Controllers\api\OutletOpeningApiController;
 use App\Http\Controllers\api\PermissionApplicationApiController;
 use App\Http\Controllers\api\PermissionCategoryApiController;
 use App\Http\Controllers\api\PermissionNoteApiController;
@@ -190,6 +191,16 @@ Route::controller(ActivityApiController::class)->prefix('activities')->group(fun
     Route::post('/check-in', 'checkIn');
     Route::post('/check-out', 'checkOut');
 });
+
+// Outlet Opening
+Route::controller(OutletOpeningApiController::class)->prefix('outlet-openings')->group(function () {
+    Route::get('/monthly', 'getMonthly');
+    Route::get('/{id}', 'getOne');
+    Route::post('/', 'store');
+    // Route::put('/{id}', 'update');
+    Route::post('/{id}/update', 'update');
+});
+
 
 
 // Route::get('/announcements', function () {

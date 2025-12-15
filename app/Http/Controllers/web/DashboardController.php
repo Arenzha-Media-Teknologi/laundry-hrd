@@ -14,6 +14,7 @@ use App\Models\LeaveApplication;
 use App\Models\Office;
 use App\Models\PermissionApplication;
 use App\Models\SickApplication;
+use App\Models\WarningLetter;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -139,6 +140,9 @@ class DashboardController extends Controller
         $divisions = Division::all();
         $offices = Office::all();
 
+        // Get late employees data
+        $lateEmployeesData = $this->getLateEmployeesData();
+
         return view('dashboard.index', [
             'timeoffs' => $timeOffs,
             'remaining_timeoffs_count' => $remainingTimeOffsCount,
@@ -159,7 +163,104 @@ class DashboardController extends Controller
             'late_attendance_todos' => $lateAttendanceTodos,
             'outside_attendance_todos' => $outsideAttendanceTodos,
             'running_activity_todos' => $runningActivityTodos,
+            'late_employees_data' => $lateEmployeesData,
         ]);
+    }
+
+    /**
+     * Get late employees data for current month
+     * - Employees with 3 late attendances
+     * - Employees with 2 late attendances in SP1 period
+     * - Employees with 1 late attendance in SP2 period
+     */
+    private function getLateEmployeesData()
+    {
+        $currentDate = Carbon::now();
+        $startOfMonth = $currentDate->copy()->startOfMonth();
+        $endOfMonth = $currentDate->copy()->endOfMonth();
+
+        // Get all late attendances in current month
+        $lateAttendances = Attendance::where('time_late', '>', 0)
+            ->where('status', 'hadir')
+            ->whereBetween('date', [$startOfMonth->toDateString(), $endOfMonth->toDateString()])
+            ->with(['employee' => function ($q) {
+                $q->with(['office' => function ($q2) {
+                    $q2->with(['division' => function ($q3) {
+                        $q3->with(['company']);
+                    }]);
+                }]);
+            }])
+            ->get();
+
+        // Group by employee and count late attendances
+        $employeeLateCounts = [];
+        foreach ($lateAttendances as $attendance) {
+            // Skip if employee is null (deleted employee)
+            if (!$attendance->employee) {
+                continue;
+            }
+
+            $employeeId = $attendance->employee_id;
+            if (!isset($employeeLateCounts[$employeeId])) {
+                $employeeLateCounts[$employeeId] = [
+                    'employee' => $attendance->employee,
+                    'count' => 0,
+                    'dates' => []
+                ];
+            }
+            $employeeLateCounts[$employeeId]['count']++;
+            $employeeLateCounts[$employeeId]['dates'][] = $attendance->date;
+        }
+
+        // Get active SP1 and SP2 for employees
+        $activeSP1 = WarningLetter::where('type', 'sp1')
+            ->where('effective_start_date', '<=', $currentDate->toDateString())
+            ->where('effective_end_date', '>=', $currentDate->toDateString())
+            ->pluck('employee_id')
+            ->toArray();
+
+        $activeSP2 = WarningLetter::where('type', 'sp2')
+            ->where('effective_start_date', '<=', $currentDate->toDateString())
+            ->where('effective_end_date', '>=', $currentDate->toDateString())
+            ->pluck('employee_id')
+            ->toArray();
+
+        // Categorize employees
+        $threeTimesLate = [];
+        $twoTimesLateInSP1 = [];
+        $oneTimeLateInSP2 = [];
+
+        foreach ($employeeLateCounts as $employeeId => $data) {
+            $employee = $data['employee'];
+            $count = $data['count'];
+            $dates = $data['dates'];
+
+            if ($count >= 3) {
+                $threeTimesLate[] = [
+                    'employee' => $employee,
+                    'count' => $count,
+                    'dates' => $dates
+                ];
+            } elseif ($count >= 2 && in_array($employeeId, $activeSP1)) {
+                $twoTimesLateInSP1[] = [
+                    'employee' => $employee,
+                    'count' => $count,
+                    'dates' => $dates
+                ];
+            } elseif ($count >= 1 && in_array($employeeId, $activeSP2)) {
+                $oneTimeLateInSP2[] = [
+                    'employee' => $employee,
+                    'count' => $count,
+                    'dates' => $dates
+                ];
+            }
+        }
+
+        return [
+            'three_times_late' => $threeTimesLate,
+            'two_times_late_in_sp1' => $twoTimesLateInSP1,
+            'one_time_late_in_sp2' => $oneTimeLateInSP2,
+        ];
     }
 
     public function getLateAttendanceTodos()
