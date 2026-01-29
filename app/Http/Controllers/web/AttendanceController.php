@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Storage;
 use Intervention\Image\Facades\Image;
 use Maatwebsite\Excel\Facades\Excel;
 use Ramsey\Uuid\Uuid;
+use App\Exports\reports\attendances\AttendanceDailyReportExport;
 
 class AttendanceController extends Controller
 {
@@ -34,7 +35,7 @@ class AttendanceController extends Controller
         $companyId = request()->query('company_id');
         $divisionId = request()->query('division_id');
         $officeId = request()->query('office_id');
-        $status = request()->query('status');
+        $attendanceStatus = request()->query('attendance_status');
 
         $employeesWithAttendancesQuery = Employee::with(['attendances' => function ($q) use ($date) {
             $q->with(['leaveApplication.category', 'longShiftConfirmer', 'permissionCategory'])->where('date', $date)->orderBy('id', 'DESC');
@@ -73,18 +74,39 @@ class AttendanceController extends Controller
             $filteredOfficeName = Office::query()->whereIn('id', $officeIds)->get()->pluck('name')->all() ?? ["Semua Kantor"];
         }
 
-        if (isset($status) && !empty($status)) {
-            $employeesWithAttendancesQuery->where('active', $status);
-            $filteredStatusName = $status == '1' ? 'Aktif' : 'Nonaktif';
+        // Filter by attendance status if specified
+        if (isset($attendanceStatus) && !empty($attendanceStatus)) {
+            if ($attendanceStatus == 'na') {
+                // For 'na', we need employees without attendance on the specified date
+                // So we need to query employees and exclude those with attendance on that date
+                $employeesWithAttendancesQuery->whereDoesntHave('attendances', function ($q) use ($date) {
+                    $q->where('date', $date);
+                });
+                $filteredStatusName = 'Tanpa Keterangan';
+            } else {
+                // For other statuses, filter employees who have attendance with matching status
+                $employeesWithAttendancesQuery->whereHas('attendances', function ($q) use ($date, $attendanceStatus) {
+                    $q->where('date', $date)->where('status', $attendanceStatus);
+                });
+                $statusNames = [
+                    'hadir' => 'Hadir',
+                    'sakit' => 'Sakit',
+                    'izin' => 'Izin',
+                    'cuti' => 'Cuti',
+                    'off' => 'OFF',
+                ];
+                $filteredStatusName = $statusNames[$attendanceStatus] ?? ucfirst($attendanceStatus);
+            }
         }
 
-        $employeesWithAttendances = $employeesWithAttendancesQuery->get();
+        $employeesWithAttendances = $employeesWithAttendancesQuery->where('active', 1)->get();
 
         $statistics = [
             'hadir' => 0,
             'sakit' => 0,
             'izin' => 0,
             'cuti' => 0,
+            'off' => 0,
             'na' => 0,
         ];
 
@@ -102,6 +124,8 @@ class AttendanceController extends Controller
                         $statistics['izin'] += 1;
                     } else if ($status == 'cuti') {
                         $statistics['cuti'] += 1;
+                    } else if ($status == 'off') {
+                        $statistics['off'] += 1;
                     }
                 }
             } else {
@@ -133,12 +157,106 @@ class AttendanceController extends Controller
                 'company_id' => $companyId,
                 'division_id' => $divisionId,
                 'office_id' => $officeId,
-                'status' => $status,
+                'status' => $attendanceStatus,
             ],
             'filtered_company_name' => $filteredCompanyName,
             'filtered_division_name' => $filteredDivisionName,
             'filtered_office_name' => $filteredOfficeName,
             'filtered_status_name' => $filteredStatusName,
+        ]);
+    }
+
+    /**
+     * Get attendance data as JSON for AJAX requests
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getData(Request $request)
+    {
+        $date = $request->query('date') ?? date('Y-m-d');
+        $companyId = $request->query('company_id');
+        $divisionId = $request->query('division_id');
+        $officeId = $request->query('office_id');
+        $attendanceStatus = $request->query('attendance_status');
+
+        $employeesWithAttendancesQuery = Employee::with(['attendances' => function ($q) use ($date) {
+            $q->with(['leaveApplication.category', 'longShiftConfirmer', 'permissionCategory'])->where('date', $date)->orderBy('id', 'DESC');
+        }, 'activeCareer.jobTitle.designation', 'office' => function ($q) {
+            $q->with(['division' => function ($q2) {
+                $q2->with(['company']);
+            }]);
+        }]);
+
+        if (isset($companyId) && !empty($companyId)) {
+            $companyIds = explode(',', $companyId);
+            $employeesWithAttendancesQuery->whereHas('office.division.company', function ($q) use ($companyIds) {
+                $q->whereIn('id', $companyIds);
+            });
+        }
+
+        if (isset($divisionId) && !empty($divisionId)) {
+            $divisionIds = explode(',', $divisionId);
+            $employeesWithAttendancesQuery->whereHas('office.division', function ($q) use ($divisionIds) {
+                $q->whereIn('id', $divisionIds);
+            });
+        }
+
+        if (isset($officeId) && !empty($officeId)) {
+            $officeIds = explode(',', $officeId);
+            $employeesWithAttendancesQuery->whereHas('office', function ($q) use ($officeIds) {
+                $q->whereIn('id', $officeIds);
+            });
+        }
+
+        // Filter by attendance status if specified
+        if (isset($attendanceStatus) && !empty($attendanceStatus)) {
+            if ($attendanceStatus == 'na') {
+                $employeesWithAttendancesQuery->whereDoesntHave('attendances', function ($q) use ($date) {
+                    $q->where('date', $date);
+                });
+            } else {
+                $employeesWithAttendancesQuery->whereHas('attendances', function ($q) use ($date, $attendanceStatus) {
+                    $q->where('date', $date)->where('status', $attendanceStatus);
+                });
+            }
+        }
+
+        $employeesWithAttendances = $employeesWithAttendancesQuery->where('active', 1)->get();
+
+        $statistics = [
+            'hadir' => 0,
+            'sakit' => 0,
+            'izin' => 0,
+            'cuti' => 0,
+            'off' => 0,
+            'na' => 0,
+        ];
+
+        collect($employeesWithAttendances)->each(function ($employee) use (&$statistics) {
+            $attendance = collect($employee->attendances)->first();
+            if ($attendance !== null) {
+                if (isset($attendance->status)) {
+                    $status = $attendance->status;
+                    if ($status == 'hadir') {
+                        $statistics['hadir'] += 1;
+                    } else if ($status == 'sakit') {
+                        $statistics['sakit'] += 1;
+                    } else if ($status == 'izin') {
+                        $statistics['izin'] += 1;
+                    } else if ($status == 'cuti') {
+                        $statistics['cuti'] += 1;
+                    } else if ($status == 'off') {
+                        $statistics['off'] += 1;
+                    }
+                }
+            } else {
+                $statistics['na'] += 1;
+            }
+        });
+
+        return response()->json([
+            'employees' => $employeesWithAttendances,
+            'statistics' => $statistics,
         ]);
     }
 
@@ -364,6 +482,8 @@ class AttendanceController extends Controller
             $overtime = $request->overtime;
             $timeLate = $request->time_late;
             $updatedBy = Auth::user()->employee->id ?? null;
+            $deleteClockIn = $request->delete_clock_in ?? false;
+            $deleteClockOut = $request->delete_clock_out ?? false;
 
             // Check employee existence 
             $employee = Employee::find($employeeId);
@@ -442,19 +562,59 @@ class AttendanceController extends Controller
             $attendance = Attendance::find($id);
             $attendance->employee_id = $employeeId;
             $attendance->date = $attendanceDate;
-            // Clock in
-            if ($clockInTime != null && $clockInTime != "null") {
-                $attendance->clock_in_time = $clockInTime;
-                $attendance->clock_in_at = $clockInAt;
+            
+            // Handle Clock In deletion
+            if ($deleteClockIn) {
+                // Delete all clock in attributes
+                $attendance->clock_in_time = null;
+                $attendance->clock_in_at = null;
+                $attendance->clock_in_working_pattern_time = null;
+                $attendance->clock_in_ip_address = null;
+                $attendance->clock_in_device_detail = null;
+                $attendance->clock_in_latitude = null;
+                $attendance->clock_in_longitude = null;
+                $attendance->clock_in_is_inside_office_radius = null;
+                $attendance->clock_in_office_latitude = null;
+                $attendance->clock_in_office_longitude = null;
+                $attendance->clock_in_note = null;
+                $attendance->clock_in_attachment = null;
+                // Reset time_late when clock in is deleted
+                $timeLate = 0;
+            } else {
+                // Clock in
+                if ($clockInTime != null && $clockInTime != "null") {
+                    $attendance->clock_in_time = $clockInTime;
+                    $attendance->clock_in_at = $clockInAt;
+                }
+                $attendance->clock_in_working_pattern_time = $clockInWorkingPatternTime;
             }
-            $attendance->clock_in_working_pattern_time = $clockInWorkingPatternTime;
-            // --
-            // Clock out
-            if ($clockOutTime != null && $clockOutTime != "null") {
-                $attendance->clock_out_time = $clockOutTime;
-                $attendance->clock_out_at = $clockOutAt;
+            
+            // Handle Clock Out deletion
+            if ($deleteClockOut) {
+                // Delete all clock out attributes
+                $attendance->clock_out_time = null;
+                $attendance->clock_out_at = null;
+                $attendance->clock_out_working_pattern_time = null;
+                $attendance->clock_out_ip_address = null;
+                $attendance->clock_out_device_detail = null;
+                $attendance->clock_out_latitude = null;
+                $attendance->clock_out_longitude = null;
+                $attendance->clock_out_is_inside_office_radius = null;
+                $attendance->clock_out_office_latitude = null;
+                $attendance->clock_out_office_longitude = null;
+                $attendance->clock_out_note = null;
+                $attendance->clock_out_attachment = null;
+                // Reset overtime when clock out is deleted
+                $overtime = 0;
+            } else {
+                // Clock out
+                if ($clockOutTime != null && $clockOutTime != "null") {
+                    $attendance->clock_out_time = $clockOutTime;
+                    $attendance->clock_out_at = $clockOutAt;
+                }
+                $attendance->clock_out_working_pattern_time = $clockOutWorkingPatternTime;
             }
-            $attendance->clock_out_working_pattern_time = $clockOutWorkingPatternTime;
+            
             // --
             $attendance->status = 'hadir';
             $attendance->time_late = $timeLate;
@@ -489,16 +649,68 @@ class AttendanceController extends Controller
      * Remove the specified resource from storage.
      *
      * @param  int  $id
+     * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id)
+    public function destroy($id, Request $request)
     {
         try {
-            $company = Attendance::findOrFail($id);
-            $company->delete();
-            return response()->json([
-                'message' => 'Data berhasil dihapus',
-            ]);
+            $attendance = Attendance::findOrFail($id);
+            $deleteType = $request->query('delete_type', 'all'); // all, clock_in, clock_out
+
+            if ($deleteType === 'all') {
+                // Delete entire attendance record
+                $attendance->delete();
+                return response()->json([
+                    'message' => 'Data kehadiran berhasil dihapus',
+                ]);
+            } elseif ($deleteType === 'clock_in') {
+                // Delete only clock in related fields
+                $attendance->clock_in_time = null;
+                $attendance->clock_in_at = null;
+                $attendance->clock_in_working_pattern_time = null;
+                $attendance->clock_in_ip_address = null;
+                $attendance->clock_in_device_detail = null;
+                $attendance->clock_in_latitude = null;
+                $attendance->clock_in_longitude = null;
+                $attendance->clock_in_is_inside_office_radius = null;
+                $attendance->clock_in_office_latitude = null;
+                $attendance->clock_in_office_longitude = null;
+                $attendance->clock_in_note = null;
+                $attendance->clock_in_attachment = null;
+                // Reset time_late when clock in is deleted
+                $attendance->time_late = 0;
+                $attendance->save();
+                
+                return response()->json([
+                    'message' => 'Data clock in berhasil dihapus',
+                ]);
+            } elseif ($deleteType === 'clock_out') {
+                // Delete only clock out related fields
+                $attendance->clock_out_time = null;
+                $attendance->clock_out_at = null;
+                $attendance->clock_out_working_pattern_time = null;
+                $attendance->clock_out_ip_address = null;
+                $attendance->clock_out_device_detail = null;
+                $attendance->clock_out_latitude = null;
+                $attendance->clock_out_longitude = null;
+                $attendance->clock_out_is_inside_office_radius = null;
+                $attendance->clock_out_office_latitude = null;
+                $attendance->clock_out_office_longitude = null;
+                $attendance->clock_out_note = null;
+                $attendance->clock_out_attachment = null;
+                // Reset overtime when clock out is deleted
+                $attendance->overtime = 0;
+                $attendance->save();
+                
+                return response()->json([
+                    'message' => 'Data clock out berhasil dihapus',
+                ]);
+            } else {
+                return response()->json([
+                    'message' => 'Jenis penghapusan tidak valid',
+                ], 400);
+            }
         } catch (Exception $e) {
             return response()->json([
                 'message' => 'Data gagal dihapus - ' . $e->getMessage(),
@@ -1872,6 +2084,77 @@ class AttendanceController extends Controller
             return response()->json([
                 'message' => $th->getMessage(),
                 'error_line' => $th->getLine(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Export daily attendance report to Excel
+     *
+     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse
+     */
+    public function exportDailyReport()
+    {
+        try {
+            $date = request()->query('date') ?? date('Y-m-d');
+            $companyId = request()->query('company_id');
+            $divisionId = request()->query('division_id');
+            $officeId = request()->query('office_id');
+            $attendanceStatus = request()->query('attendance_status');
+
+            $employeesWithAttendancesQuery = Employee::with(['attendances' => function ($q) use ($date) {
+                $q->with(['leaveApplication.category', 'longShiftConfirmer', 'permissionCategory'])->where('date', $date)->orderBy('id', 'DESC');
+            }, 'activeCareer.jobTitle.designation', 'office' => function ($q) {
+                $q->with(['division' => function ($q2) {
+                    $q2->with(['company']);
+                }]);
+            }]);
+
+            if (isset($companyId) && !empty($companyId)) {
+                $companyIds = explode(',', $companyId);
+                $employeesWithAttendancesQuery->whereHas('office.division.company', function ($q) use ($companyIds) {
+                    $q->whereIn('id', $companyIds);
+                });
+            }
+
+            if (isset($divisionId) && !empty($divisionId)) {
+                $divisionIds = explode(',', $divisionId);
+                $employeesWithAttendancesQuery->whereHas('office.division', function ($q) use ($divisionIds) {
+                    $q->whereIn('id', $divisionIds);
+                });
+            }
+
+            if (isset($officeId) && !empty($officeId)) {
+                $officeIds = explode(',', $officeId);
+                $employeesWithAttendancesQuery->whereHas('office', function ($q) use ($officeIds) {
+                    $q->whereIn('id', $officeIds);
+                });
+            }
+
+            // Filter by attendance status if specified
+            if (isset($attendanceStatus) && !empty($attendanceStatus)) {
+                if ($attendanceStatus == 'na') {
+                    // For 'na', we need employees without attendance on the specified date
+                    $employeesWithAttendancesQuery->whereDoesntHave('attendances', function ($q) use ($date) {
+                        $q->where('date', $date);
+                    });
+                } else {
+                    // For other statuses, filter employees who have attendance with matching status
+                    $employeesWithAttendancesQuery->whereHas('attendances', function ($q) use ($date, $attendanceStatus) {
+                        $q->where('date', $date)->where('status', $attendanceStatus);
+                    });
+                }
+            }
+
+            $employeesWithAttendances = $employeesWithAttendancesQuery->where('active', 1)->get();
+
+            $formattedDate = \Carbon\Carbon::parse($date)->locale('id')->isoFormat('D MMMM YYYY');
+            $fileName = 'Laporan Absensi ' . $formattedDate . '.xlsx';
+
+            return Excel::download(new AttendanceDailyReportExport($employeesWithAttendances, $date, $attendanceStatus), $fileName);
+        } catch (Exception $e) {
+            return response()->json([
+                'message' => 'Error exporting report: ' . $e->getMessage(),
             ], 500);
         }
     }

@@ -24,7 +24,7 @@ $permissions = json_decode($groupPermissions);
                 <div class="card-header bgi-no-repeat bgi-size-cover bgi-position-y-top bgi-position-x-center align-items-start" style="background-image:url('assets/media/svg/shapes/top-green.png')">
                     <!--begin::Title-->
                     <h3 class="card-title align-items-start flex-column text-white pt-15">
-                        <span class="fw-bolder fs-2x mb-3">Halo, Admin</span>
+                        <span class="fw-bolder fs-2x mb-3">Halo, {{ Auth::user()->employee->name ?? 'Admin' }}</span>
                         <div class="fs-4 text-white">
                             <span class="opacity-75">Hari ini {{ \Carbon\Carbon::now()->locale('id')->dayName }}, {{ \Carbon\Carbon::now()->isoFormat('LL') }}</span>
                         </div>
@@ -168,6 +168,7 @@ $permissions = json_decode($groupPermissions);
                                             <th class="text-center min-w-150px">Kantor</th>
                                             <th class="text-center min-w-150px">Jumlah Terlambat</th>
                                             <th class="text-center min-w-200px">Tanggal Terlambat</th>
+                                            <th class="text-center min-w-150px">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody class="fw-bold text-gray-600">
@@ -192,10 +193,21 @@ $permissions = json_decode($groupPermissions);
                                                 <span class="badge badge-light me-1">{{ \Carbon\Carbon::parse($date)->isoFormat('DD MMM') }}</span>
                                                 @endforeach
                                             </td>
+                                            <td class="text-center">
+                                                <button type="button"
+                                                    class="btn btn-sm btn-light-danger"
+                                                    data-employee-id="{{ $data['employee']->id }}"
+                                                    data-late-count="{{ $data['count'] }}"
+                                                    data-mode="three_times_late"
+                                                    data-dates='@json($data["dates"])'
+                                                    onclick="createWarningLetterFromLate(this)">
+                                                    Buat SP1 (3 bln)
+                                                </button>
+                                            </td>
                                         </tr>
                                         @empty
                                         <tr>
-                                            <td colspan="6" class="text-center text-muted">Tidak ada data</td>
+                                            <td colspan="7" class="text-center text-muted">Tidak ada data</td>
                                         </tr>
                                         @endforelse
                                     </tbody>
@@ -215,6 +227,7 @@ $permissions = json_decode($groupPermissions);
                                             <th class="text-center min-w-150px">Kantor</th>
                                             <th class="text-center min-w-150px">Jumlah Terlambat</th>
                                             <th class="text-center min-w-200px">Tanggal Terlambat</th>
+                                            <th class="text-center min-w-150px">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody class="fw-bold text-gray-600">
@@ -239,10 +252,21 @@ $permissions = json_decode($groupPermissions);
                                                 <span class="badge badge-light me-1">{{ \Carbon\Carbon::parse($date)->isoFormat('DD MMM') }}</span>
                                                 @endforeach
                                             </td>
+                                            <td class="text-center">
+                                                <button type="button"
+                                                    class="btn btn-sm btn-light-warning"
+                                                    data-employee-id="{{ $data['employee']->id }}"
+                                                    data-late-count="{{ $data['count'] }}"
+                                                    data-mode="two_times_late_sp1"
+                                                    data-dates='@json($data["dates"])'
+                                                    onclick="createWarningLetterFromLate(this)">
+                                                    Buat SP2 (2 bln)
+                                                </button>
+                                            </td>
                                         </tr>
                                         @empty
                                         <tr>
-                                            <td colspan="6" class="text-center text-muted">Tidak ada data</td>
+                                            <td colspan="7" class="text-center text-muted">Tidak ada data</td>
                                         </tr>
                                         @endforelse
                                     </tbody>
@@ -262,6 +286,7 @@ $permissions = json_decode($groupPermissions);
                                             <th class="text-center min-w-150px">Kantor</th>
                                             <th class="text-center min-w-150px">Jumlah Terlambat</th>
                                             <th class="text-center min-w-200px">Tanggal Terlambat</th>
+                                            <th class="text-center min-w-150px">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody class="fw-bold text-gray-600">
@@ -286,10 +311,21 @@ $permissions = json_decode($groupPermissions);
                                                 <span class="badge badge-light me-1">{{ \Carbon\Carbon::parse($date)->isoFormat('DD MMM') }}</span>
                                                 @endforeach
                                             </td>
+                                            <td class="text-center">
+                                                <button type="button"
+                                                    class="btn btn-sm btn-light-info"
+                                                    data-employee-id="{{ $data['employee']->id }}"
+                                                    data-late-count="{{ $data['count'] }}"
+                                                    data-mode="one_time_late_sp2"
+                                                    data-dates='@json($data["dates"])'
+                                                    onclick="createWarningLetterFromLate(this)">
+                                                    Buat SP3 & Nonaktif
+                                                </button>
+                                            </td>
                                         </tr>
                                         @empty
                                         <tr>
-                                            <td colspan="6" class="text-center text-muted">Tidak ada data</td>
+                                            <td colspan="7" class="text-center text-muted">Tidak ada data</td>
                                         </tr>
                                         @endforelse
                                     </tbody>
@@ -1463,5 +1499,67 @@ $permissions = json_decode($groupPermissions);
         }
 
     })
+</script>
+
+<script>
+    async function createWarningLetterFromLate(buttonEl) {
+        try {
+            const employeeId = buttonEl?.dataset?.employeeId;
+            const lateCount = buttonEl?.dataset?.lateCount;
+            const mode = buttonEl?.dataset?.mode;
+            let dates = [];
+            try {
+                dates = JSON.parse(buttonEl?.dataset?.dates || '[]') || [];
+            } catch (e) {
+                dates = [];
+            }
+
+            let confirmText = 'Buat surat peringatan otomatis?';
+            let confirmTitle = 'Konfirmasi';
+            let confirmIcon = 'question';
+
+            if (mode === 'one_time_late_sp2') {
+                confirmText = 'Buat SP3 otomatis dan NONAKTIFKAN pegawai sekarang?';
+                confirmTitle = 'Peringatan';
+                confirmIcon = 'warning';
+            }
+
+            const result = await Swal.fire({
+                title: confirmTitle,
+                text: confirmText,
+                icon: confirmIcon,
+                showCancelButton: true,
+                confirmButtonText: 'Ya, Buat',
+                cancelButtonText: 'Batal',
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                reverseButtons: true
+            });
+
+            if (!result.isConfirmed) {
+                return;
+            }
+
+            const payload = {
+                employee_id: parseInt(employeeId),
+                late_count: parseInt(lateCount),
+                dates: dates || [],
+                mode: mode,
+            };
+
+            const response = await axios.post(`/warning-letters/auto-from-late`, payload);
+            const message = response?.data?.message || 'Surat peringatan berhasil dibuat.';
+            toastr.success(message);
+
+            // Refresh to reflect latest state (especially for deactivation / tab movement)
+            window.location.reload();
+        } catch (error) {
+            let message = error?.response?.data?.message;
+            if (!message) {
+                message = 'Something wrong...';
+            }
+            toastr.error(message);
+        }
+    }
 </script>
 @endsection

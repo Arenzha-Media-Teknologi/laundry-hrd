@@ -15,7 +15,7 @@ License: For each use you must have a valid license purchased only from above li
 
 <head>
     <base href="">
-    <title>@yield('title') | Roket HRD</title>
+    <title>@yield('title') | Laundry HRD</title>
     <meta charset="utf-8" />
     <meta name="description" content="Make your HR life easy" />
     <meta name="keywords" content="Roket HRD, Roket Mediatama, Yo Tinco, Tinco" />

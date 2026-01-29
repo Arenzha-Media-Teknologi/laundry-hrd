@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\api;
+namespace App\Http\Controllers\web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Attendance;
@@ -11,105 +11,103 @@ use App\Models\WorkScheduleItem;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
-class OfficeApiController extends Controller
+class DailyOutletReportController extends Controller
 {
-    public function getAll()
-    {
-        try {
-            $offices = Office::all();
-
-            return response()->json([
-                'message' => 'OK',
-                'data' => $offices,
-            ]);
-        } catch (\Throwable $th) {
-            return response()->json([
-                'message' => $th->getMessage(),
-            ], 500);
-        }
-    }
-
     /**
-     * Get daily outlet opening report data.
-     * 
+     * Display daily outlet opening report.
+     *
      * @param \Illuminate\Http\Request $request
      * @return \Illuminate\Http\Response
      */
-    public function getDailyOutletOpeningReport(Request $request)
+    public function index(Request $request)
     {
         try {
             $employeeId = $request->query('employee_id');
             $date = $request->query('date', Carbon::now()->format('Y-m-d'));
-            $isPagination = $request->query('is_pagination', 0);
-            $perPage = $request->query('per_page', 15);
 
+            // If no employee_id provided, get current authenticated user's employee
             if (empty($employeeId)) {
-                return response()->json([
-                    'message' => 'employee_id is required',
-                ], 400);
+                $user = auth()->user();
+                if ($user && $user->employee) {
+                    $employeeId = $user->employee->id;
+                } else {
+                    return view('daily-outlet-reports.index', [
+                        'outlets' => [],
+                        'statistics' => [
+                            'total' => 0,
+                            'opened' => 0,
+                            'not_opened' => 0,
+                        ],
+                        'date' => $date,
+                        'employee' => null,
+                    ]);
+                }
             }
 
             // Get employee and their credential
             $employee = Employee::with(['credential'])->find($employeeId);
 
             if (!$employee) {
-                return response()->json([
-                    'message' => 'Employee not found',
-                ], 404);
+                return view('daily-outlet-reports.index', [
+                    'outlets' => [],
+                    'statistics' => [
+                        'total' => 0,
+                        'opened' => 0,
+                        'not_opened' => 0,
+                    ],
+                    'date' => $date,
+                    'employee' => null,
+                ]);
             }
 
             if (!$employee->credential) {
-                return response()->json([
-                    'message' => 'Employee credential not found',
-                ], 404);
+                return view('daily-outlet-reports.index', [
+                    'outlets' => [],
+                    'statistics' => [
+                        'total' => 0,
+                        'opened' => 0,
+                        'not_opened' => 0,
+                    ],
+                    'date' => $date,
+                    'employee' => $employee,
+                ]);
             }
 
             // Get accessible offices from credential
             $accessibleOfficesIds = json_decode($employee->credential->accessible_offices ?? "[]", true);
 
             if (empty($accessibleOfficesIds) || !is_array($accessibleOfficesIds)) {
-                if ($isPagination == 1) {
-                    return response()->json([
-                        'message' => 'OK',
-                        'data' => [],
-                        'pagination' => [
-                            'current_page' => 1,
-                            'per_page' => $perPage,
-                            'total' => 0,
-                            'last_page' => 1,
-                            'from' => null,
-                            'to' => null,
-                        ],
-                    ]);
-                }
-                return response()->json([
-                    'message' => 'OK',
-                    'data' => [],
+                return view('daily-outlet-reports.index', [
+                    'outlets' => [],
+                    'statistics' => [
+                        'total' => 0,
+                        'opened' => 0,
+                        'not_opened' => 0,
+                    ],
+                    'date' => $date,
+                    'employee' => $employee,
                 ]);
             }
 
-            // Get offices with or without pagination
-            if ($isPagination == 1) {
-                $officesQuery = Office::whereIn('id', $accessibleOfficesIds);
-                $offices = $officesQuery->paginate($perPage)->withQueryString();
-                $currentPageOfficeIds = collect($offices->items())->pluck('id')->all();
-            } else {
-                $offices = Office::whereIn('id', $accessibleOfficesIds)->get();
-                $currentPageOfficeIds = $accessibleOfficesIds;
-            }
+            // Get total offices count for statistics
+            $totalOffices = Office::whereIn('id', $accessibleOfficesIds)->count();
 
-            // Get outlet openings for the date (only for current page offices if pagination)
+            // Get all offices (no pagination)
+            $offices = Office::whereIn('id', $accessibleOfficesIds)->get();
+            $officeIds = $offices->pluck('id')->all();
+
+            // Get outlet openings for the date (all offices)
             $outletOpenings = OutletOpening::where('date', $date)
-                ->whereIn('office_id', $currentPageOfficeIds)
+                ->whereIn('office_id', $officeIds)
                 ->get()
                 ->keyBy('office_id');
 
-            // Get work schedule items for the date (only for current page offices if pagination)
+            // Get work schedule items for the date (all offices)
             $workScheduleItems = WorkScheduleItem::with(['employee' => function ($q) {
                 $q->where('active', 1);
             }])
                 ->where('date', $date)
-                ->whereIn('office_id', $currentPageOfficeIds)
+                ->whereIn('office_id', $officeIds)
                 ->where(function ($q) {
                     $q->where('is_off', 0)->orWhereNull('is_off');
                 })
@@ -119,11 +117,11 @@ class OfficeApiController extends Controller
                 ->get()
                 ->groupBy('office_id');
 
-            // Get attendance count per office (employees with status = "hadir")
+            // Get attendance count per office (employees with status = "hadir") - all offices
             $attendanceCounts = Attendance::where('date', $date)
                 ->where('status', 'hadir')
-                ->whereHas('employee', function ($q) use ($currentPageOfficeIds) {
-                    $q->whereIn('office_id', $currentPageOfficeIds)
+                ->whereHas('employee', function ($q) use ($officeIds) {
+                    $q->whereIn('office_id', $officeIds)
                         ->where('active', 1);
                 })
                 ->join('employees', 'attendances.employee_id', '=', 'employees.id')
@@ -131,7 +129,7 @@ class OfficeApiController extends Controller
                 ->groupBy('employees.office_id')
                 ->pluck('count', 'office_id');
 
-            // Get all attendances for employees in current page offices
+            // Get all attendances for employees
             $employeeIds = $workScheduleItems->flatten()
                 ->pluck('employee_id')
                 ->filter()
@@ -147,9 +145,8 @@ class OfficeApiController extends Controller
                     ->keyBy('employee_id');
             }
 
-            // Build result with area managers, supervisors, and leaders
-            $officesCollection = $isPagination == 1 ? $offices->items() : $offices;
-            $result = collect($officesCollection)->map(function ($office) use ($outletOpenings, $workScheduleItems, $attendanceCounts, $attendances, $date) {
+            // Build result
+            $outlets = $offices->map(function ($office) use ($outletOpenings, $workScheduleItems, $attendanceCounts, $attendances, $date) {
                 $officeId = $office->id;
                 $outletOpening = $outletOpenings->get($officeId);
 
@@ -178,7 +175,6 @@ class OfficeApiController extends Controller
                     ->all();
 
                 // Get all employees with credentials that have this office in accessible_offices
-                // Then filter by job title
                 $allEmployees = Employee::with(['credential', 'activeCareer'])
                     ->whereHas('credential', function ($q) use ($officeId) {
                         $q->whereNotNull('accessible_offices');
@@ -240,167 +236,90 @@ class OfficeApiController extends Controller
                 ];
             })->values()->all();
 
-            if ($isPagination == 1) {
-                return response()->json([
-                    'message' => 'OK',
-                    'data' => $result,
-                    'pagination' => [
-                        'current_page' => $offices->currentPage(),
-                        'per_page' => $offices->perPage(),
-                        'total' => $offices->total(),
-                        'last_page' => $offices->lastPage(),
-                        'from' => $offices->firstItem(),
-                        'to' => $offices->lastItem(),
-                        'has_more_pages' => $offices->hasMorePages(),
-                        'next_page_url' => $offices->nextPageUrl(),
-                        'prev_page_url' => $offices->previousPageUrl(),
-                    ],
-                ]);
-            }
-
-            return response()->json([
-                'message' => 'OK',
-                'data' => $result,
-            ]);
-        } catch (\Throwable $th) {
-            return response()->json([
-                'message' => $th->getMessage(),
-            ], 500);
-        }
-    }
-
-    /**
-     * Get statistics of opened and not opened outlets.
-     * 
-     * @param \Illuminate\Http\Request $request
-     * @return \Illuminate\Http\Response
-     */
-    public function getOutletOpeningStatistics(Request $request)
-    {
-        try {
-            $employeeId = $request->query('employee_id');
-            $date = $request->query('date', Carbon::now()->format('Y-m-d'));
-
-            if (empty($employeeId)) {
-                return response()->json([
-                    'message' => 'employee_id is required',
-                ], 400);
-            }
-
-            // Get employee and their credential
-            $employee = Employee::with(['credential'])->find($employeeId);
-
-            if (!$employee) {
-                return response()->json([
-                    'message' => 'Employee not found',
-                ], 404);
-            }
-
-            if (!$employee->credential) {
-                return response()->json([
-                    'message' => 'Employee credential not found',
-                ], 404);
-            }
-
-            // Get accessible offices from credential
-            $accessibleOfficesIds = json_decode($employee->credential->accessible_offices ?? "[]", true);
-
-            if (empty($accessibleOfficesIds) || !is_array($accessibleOfficesIds)) {
-                return response()->json([
-                    'message' => 'OK',
-                    'data' => [
-                        'total' => 0,
-                        'opened' => 0,
-                        'not_opened' => 0,
-                    ],
-                ]);
-            }
-
-            // Get total offices count
-            $totalOffices = Office::whereIn('id', $accessibleOfficesIds)->count();
-
-            // Get opened outlets count (outlets that have outlet opening record for the date)
+            // Get statistics (from all accessible offices)
             $openedOffices = OutletOpening::where('date', $date)
                 ->whereIn('office_id', $accessibleOfficesIds)
                 ->selectRaw('COUNT(DISTINCT office_id) as count')
                 ->value('count') ?? 0;
-
-            // Calculate not opened outlets
             $notOpenedOffices = $totalOffices - $openedOffices;
 
-            return response()->json([
-                'message' => 'OK',
-                'data' => [
+            return view('daily-outlet-reports.index', [
+                'outlets' => collect($outlets),
+                'statistics' => [
                     'total' => $totalOffices,
                     'opened' => $openedOffices,
                     'not_opened' => $notOpenedOffices,
-                    'date' => $date,
                 ],
+                'date' => $date,
+                'employee' => $employee,
             ]);
         } catch (\Throwable $th) {
-            return response()->json([
-                'message' => $th->getMessage(),
-            ], 500);
+            return view('daily-outlet-reports.index', [
+                'outlets' => [],
+                'statistics' => [
+                    'total' => 0,
+                    'opened' => 0,
+                    'not_opened' => 0,
+                ],
+                'date' => $date ?? Carbon::now()->format('Y-m-d'),
+                'employee' => null,
+                'error' => $th->getMessage(),
+            ]);
         }
     }
 
     /**
-     * Get daily outlet opening report detail for a specific outlet.
-     * 
+     * Display daily outlet opening report detail.
+     *
      * @param \Illuminate\Http\Request $request
      * @param int $officeId
      * @return \Illuminate\Http\Response
      */
-    public function getDailyOutletOpeningReportDetail(Request $request, $officeId)
+    public function show(Request $request, $officeId)
     {
         try {
             $employeeId = $request->query('employee_id');
             $date = $request->query('date', Carbon::now()->format('Y-m-d'));
 
+            // If no employee_id provided, get current authenticated user's employee
             if (empty($employeeId)) {
-                return response()->json([
-                    'message' => 'employee_id is required',
-                ], 400);
+                $user = auth()->user();
+                if ($user && $user->employee) {
+                    $employeeId = $user->employee->id;
+                } else {
+                    return redirect()->route('daily-outlet-reports.index')
+                        ->with('error', 'Employee not found');
+                }
             }
 
             // Get employee and their credential
             $employee = Employee::with(['credential'])->find($employeeId);
 
-            if (!$employee) {
-                return response()->json([
-                    'message' => 'Employee not found',
-                ], 404);
-            }
-
-            if (!$employee->credential) {
-                return response()->json([
-                    'message' => 'Employee credential not found',
-                ], 404);
+            if (!$employee || !$employee->credential) {
+                return redirect()->route('daily-outlet-reports.index')
+                    ->with('error', 'Employee credential not found');
             }
 
             // Get accessible offices from credential
             $accessibleOfficesIds = json_decode($employee->credential->accessible_offices ?? "[]", true);
 
             if (empty($accessibleOfficesIds) || !is_array($accessibleOfficesIds)) {
-                return response()->json([
-                    'message' => 'No accessible offices found',
-                ], 403);
+                return redirect()->route('daily-outlet-reports.index')
+                    ->with('error', 'No accessible offices found');
             }
 
             // Check if office is accessible
             if (!in_array($officeId, $accessibleOfficesIds)) {
-                return response()->json([
-                    'message' => 'Office not accessible',
-                ], 403);
+                return redirect()->route('daily-outlet-reports.index')
+                    ->with('error', 'Office not accessible');
             }
 
             // Get office
             $office = Office::find($officeId);
 
             if (!$office) {
-                return response()->json([
-                    'message' => 'Office not found',
-                ], 404);
+                return redirect()->route('daily-outlet-reports.index')
+                    ->with('error', 'Office not found');
             }
 
             // Get outlet opening for the date
@@ -446,13 +365,14 @@ class OfficeApiController extends Controller
                     $clockInTime = null;
 
                     if ($attendance) {
-                        $attendanceStatus = $attendance->status ?? 'hadir';
+                        $attendanceStatus = $attendance->status ?? 'Tanpa Keterangan';
                         $clockInTime = $attendance->clock_in_time ?? null;
                     }
 
                     return [
                         'id' => $item->employee->id,
                         'name' => $item->employee->name,
+                        'photo' => $item->employee->photo ?? null,
                         'attendance_status' => $attendanceStatus,
                         'clock_in_time' => $clockInTime,
                     ];
@@ -473,7 +393,6 @@ class OfficeApiController extends Controller
                 ->count();
 
             // Get all employees with credentials that have this office in accessible_offices
-            // Then filter by job title
             $allEmployees = Employee::with(['credential', 'activeCareer'])
                 ->whereHas('credential', function ($q) use ($officeId) {
                     $q->whereNotNull('accessible_offices');
@@ -520,7 +439,7 @@ class OfficeApiController extends Controller
                 ];
             })->values()->all();
 
-            $result = [
+            $outlet = [
                 'id' => $office->id,
                 'name' => $office->name,
                 'open_time' => $office->opening_time ?? $office->open_time ?? null,
@@ -534,14 +453,14 @@ class OfficeApiController extends Controller
                 'leaders' => $leaders,
             ];
 
-            return response()->json([
-                'message' => 'OK',
-                'data' => $result,
+            return view('daily-outlet-reports.show', [
+                'outlet' => $outlet,
+                'date' => $date,
+                'employee' => $employee,
             ]);
         } catch (\Throwable $th) {
-            return response()->json([
-                'message' => $th->getMessage(),
-            ], 500);
+            return redirect()->route('daily-outlet-reports.index')
+                ->with('error', $th->getMessage());
         }
     }
 }

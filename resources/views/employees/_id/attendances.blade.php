@@ -88,6 +88,16 @@
                     </div>
                     <!--end::Completion Item-->
                     <!--begin::Completion Item-->
+                    <div class="d-flex justify-content-between align-items-center border-bottom mb-4 p-1">
+                        <div>
+                            <span class="fw-bolder fs-5 text-gray-700"><span class="bullet bullet-vertical bg-secondary me-5"></span> OFF</span>
+                        </div>
+                        <div>
+                            <span class="fw-bolder fs-5">@{{ statistics.off || 0 }}</span>
+                        </div>
+                    </div>
+                    <!--end::Completion Item-->
+                    <!--begin::Completion Item-->
                     <div class="d-flex justify-content-between align-items-center border-bottom mb-4 border-gray-300 p-1">
                         <div>
                             <span class="fw-bolder fs-5 text-gray-700"><span class="bullet bullet-vertical me-5"></span> Tanpa Keterangan</span>
@@ -331,6 +341,12 @@
                                 color: `badge-info`,
                         };
                         break;
+                    case 'off':
+                        return {
+                            text: 'OFF',
+                                color: `badge-secondary`,
+                        };
+                        break;
                     default:
                         return {
                             text: 'Tanpa Keterangan',
@@ -349,6 +365,7 @@
         info: KTUtil.getCssVariableValue('--bs-info'),
         warning: KTUtil.getCssVariableValue('--bs-warning'),
         light: KTUtil.getCssVariableValue('--bs-dark'),
+        secondary: KTUtil.getCssVariableValue('--bs-secondary'),
     }
     var options = {
         chart: {
@@ -364,9 +381,9 @@
         legend: {
             show: false
         },
-        series: [statistics.hadir, statistics.sakit, statistics.izin, statistics.cuti, statistics.na],
-        labels: ['Hadir', 'Sakit', 'Izin', 'Cuti', 'Tanpa Keterangan'],
-        colors: [bgColor.success, bgColor.warning, bgColor.primary, bgColor.info, bgColor.light],
+        series: [statistics.hadir, statistics.sakit, statistics.izin, statistics.cuti, statistics.off || 0, statistics.na],
+        labels: ['Hadir', 'Sakit', 'Izin', 'Cuti', 'OFF', 'Tanpa Keterangan'],
+        colors: [bgColor.success, bgColor.warning, bgColor.primary, bgColor.info, bgColor.secondary, bgColor.light],
     }
 
     var chart = new ApexCharts(document.querySelector("#attendance_pie_chart"), options);
@@ -410,7 +427,7 @@
 
                     if (data.statistics) {
                         chart.updateSeries(
-                            [data.statistics.hadir, data.statistics.sakit, data.statistics.izin, data.statistics.cuti, data.statistics.na]
+                            [data.statistics.hadir, data.statistics.sakit, data.statistics.izin, data.statistics.cuti, data.statistics.off || 0, data.statistics.na]
                         )
                     }
                 }

@@ -437,6 +437,7 @@ class AttendanceApiController extends Controller
             $note = $splittedNote[1] ?? null;
             $permissionNote = $splittedNote[0] ?? null;
             $permissionCategoryId = $request->permission_category_id;
+            $status = $request->status ?? 'hadir';
 
             $todayAttendance = Attendance::query()
                 ->where('employee_id', $employeeId)
@@ -464,7 +465,8 @@ class AttendanceApiController extends Controller
             $workingPatternDay = null;
             $workScheduleWorkingPatternId = null;
 
-            if ($todayWorkSchedule != null) {
+            // Skip validasi work schedule is_off jika status = "off" (user memilih OFF secara manual)
+            if ($todayWorkSchedule != null && $status !== 'off') {
                 $isOff = $todayWorkSchedule->is_off;
                 if ($isOff == 1) {
                     throw new Error('Gagal absen, jadwal kamu OFF hari ini');
@@ -485,7 +487,8 @@ class AttendanceApiController extends Controller
                     }
                 }
             } else {
-                if (isset($workingPatternId) && $workingPatternId !== "") {
+                // Skip perhitungan time_late jika status = "off"
+                if ($status !== 'off' && isset($workingPatternId) && $workingPatternId !== "") {
                     $activeWorkingPattern = WorkingPattern::with(['items'])->find($workingPatternId);
 
                     if ($activeWorkingPattern == null) {
@@ -551,7 +554,7 @@ class AttendanceApiController extends Controller
             $attendance->clock_in_office_latitude = $clockInOfficeLatitude;
             $attendance->clock_in_office_longitude = $clockInOfficeLongitude;
             $attendance->clock_in_working_pattern_time = $workingPatternDay->clock_in ?? null;
-            $attendance->status = 'hadir';
+            $attendance->status = $status;
             $attendance->time_late = $timeLate;
             $attendance->clock_in_note = $note;
             $attendance->clock_in_attachment = $urlPath;
@@ -630,6 +633,8 @@ class AttendanceApiController extends Controller
             $clockInOfficeLatitude = $request->clock_in_office_latitude;
             $clockInOfficeLongitude = $request->clock_in_office_longitude;
             $note = $request->clock_in_note;
+            $status = $request->status ?? 'hadir';
+            $permissionCategoryId = $request->permission_category_id;
 
             $todayAttendance = Attendance::query()
                 ->where('employee_id', $employeeId)
@@ -653,7 +658,8 @@ class AttendanceApiController extends Controller
 
             $todayWorkSchedule = WorkScheduleItem::where('employee_id', $employeeId)->where('date', $attendanceDate)->first();
 
-            if ($todayWorkSchedule != null) {
+            // Skip validasi work schedule is_off jika status = "off" (user memilih OFF secara manual)
+            if ($todayWorkSchedule != null && $status !== 'off') {
                 $isOff = $todayWorkSchedule->is_off;
                 if ($isOff == 1) {
                     throw new Error('Gagal absen, jadwal kamu OFF hari ini');
@@ -662,8 +668,9 @@ class AttendanceApiController extends Controller
 
             $timeLate = 0;
 
+            // Skip perhitungan time_late jika status = "off"
             $workingPatternDay = null;
-            if (isset($workingPatternId) && $workingPatternId !== "") {
+            if ($status !== 'off' && isset($workingPatternId) && $workingPatternId !== "") {
                 $activeWorkingPattern = WorkingPattern::with(['items'])->find($workingPatternId);
 
                 if ($activeWorkingPattern == null) {
@@ -737,11 +744,19 @@ class AttendanceApiController extends Controller
             $attendance->clock_in_office_latitude = $clockInOfficeLatitude;
             $attendance->clock_in_office_longitude = $clockInOfficeLongitude;
             $attendance->clock_in_working_pattern_time = $workingPatternDay->clock_in ?? null;
-            $attendance->status = 'hadir';
+            $attendance->status = $status;
             $attendance->time_late = $timeLate;
             $attendance->clock_in_note = $note;
             $attendance->clock_in_attachment = $urlPath;
             $attendance->working_pattern_id = $workingPatternId;
+            
+            // Set permission category jika ada
+            if (!empty($permissionCategoryId)) {
+                $attendance->is_permission = 1;
+                $attendance->permission_category_id = $permissionCategoryId;
+                $attendance->permission_status = "pending";
+            }
+            
             $attendance->save();
 
             if ($employee->office_id) {

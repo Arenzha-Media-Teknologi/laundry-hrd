@@ -26,6 +26,21 @@ use Maatwebsite\Excel\Facades\Excel;
 class WorkScheduleController extends Controller
 {
     /**
+     * Get accessible office IDs from current user's credential
+     *
+     * @return array
+     */
+    private function getAccessibleOfficeIds()
+    {
+        $user = Auth::user();
+        if (!$user || !$user->accessible_offices) {
+            return [];
+        }
+        $accessibleOfficesIds = json_decode($user->accessible_offices ?? "[]", true);
+        return is_array($accessibleOfficesIds) ? $accessibleOfficesIds : [];
+    }
+
+    /**
      * Display a listing of the resource.
      *
      * @return \Illuminate\Http\Response
@@ -40,20 +55,21 @@ class WorkScheduleController extends Controller
 
         $months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
-        // $schedules = WorkSchedule::select(['id', 'start_date', 'end_date'])
-        //     ->whereYear('end_date', $year)
-        //     ->get()
-        //     ->groupBy([function ($schedule) {
-        //         return (int) date('m', strtotime($schedule->end_date)) - 1;
-        //     }, function ($schedule) {
-        //         return $schedule->start_date . '/' . $schedule->end_date;
-        //     }])->sort()
-        //     ->all();
-        $schedules = WorkSchedule::select(['id', 'start_date', 'end_date'])
-            ->whereYear('end_date', $year)
-            ->get()->groupBy([function ($schedule) {
-                return (int) date('m', strtotime($schedule->end_date)) - 1;
-            }])->all();
+        $accessibleOfficeIds = $this->getAccessibleOfficeIds();
+
+        $workScheduleQuery = WorkSchedule::select(['id', 'start_date', 'end_date'])
+            ->whereYear('end_date', $year);
+
+        // Filter work schedules by accessible offices if user has limited access
+        if (!empty($accessibleOfficeIds)) {
+            $workScheduleQuery->whereHas('items', function ($q) use ($accessibleOfficeIds) {
+                $q->whereIn('office_id', $accessibleOfficeIds);
+            });
+        }
+
+        $schedules = $workScheduleQuery->get()->groupBy([function ($schedule) {
+            return (int) date('m', strtotime($schedule->end_date)) - 1;
+        }])->all();
 
         // return $schedules;
 
@@ -73,13 +89,31 @@ class WorkScheduleController extends Controller
     {
         $companies = Company::all();
         $workScheduleWorkingPatterns = WorkScheduleWorkingPattern::all();
-        $usedWorkScheduleDates = WorkSchedule::all()->flatMap(function ($workSchedule) {
+        $accessibleOfficeIds = $this->getAccessibleOfficeIds();
+
+        $workScheduleQuery = WorkSchedule::query();
+
+        // Filter work schedules by accessible offices if user has limited access
+        if (!empty($accessibleOfficeIds)) {
+            $workScheduleQuery->whereHas('items', function ($q) use ($accessibleOfficeIds) {
+                $q->whereIn('office_id', $accessibleOfficeIds);
+            });
+        }
+
+        $usedWorkScheduleDates = $workScheduleQuery->get()->flatMap(function ($workSchedule) {
             return $this->getDatesFromRange($workSchedule->start_date, $workSchedule->end_date);
         })->all();
 
         // return $workSchedulesDates;
 
-        $offices = Office::all();
+        $officesQuery = Office::query();
+
+        // Filter offices by accessible offices if user has limited access
+        if (!empty($accessibleOfficeIds)) {
+            $officesQuery->whereIn('id', $accessibleOfficeIds);
+        }
+
+        $offices = $officesQuery->get();
         // return 'asdsd';
         return view('work-schedule.create', [
             'offices' => $offices,
@@ -107,13 +141,22 @@ class WorkScheduleController extends Controller
         }
 
         try {
-            $employees = Employee::with([
+            $accessibleOfficeIds = $this->getAccessibleOfficeIds();
+
+            $employeesQuery = Employee::with([
                 'office',
                 'activeCareer.jobTitle',
                 'salaryComponents' => function ($q) {
                     $q->orderBy('employee_salary_component.id', 'DESC')->orderBy('employee_salary_component.effective_date', 'DESC');
                 },
-            ])->where('aerplus_daily_salary', 1)->where('active', 1)->get();
+            ])->where('aerplus_daily_salary', 1)->where('active', 1);
+
+            // Filter employees by accessible offices if user has limited access
+            if (!empty($accessibleOfficeIds)) {
+                $employeesQuery->whereIn('office_id', $accessibleOfficeIds);
+            }
+
+            $employees = $employeesQuery->get();
 
             // return collect($employees[0])->except(['attendances', 'salary_components'])->all();
 
@@ -199,6 +242,8 @@ class WorkScheduleController extends Controller
     {
         DB::beginTransaction();
         try {
+            $accessibleOfficeIds = $this->getAccessibleOfficeIds();
+
             $newWorkSchedule = new WorkSchedule();
             $newWorkSchedule->start_date = $request->start_date;
             $newWorkSchedule->end_date = $request->end_date;
@@ -208,14 +253,36 @@ class WorkScheduleController extends Controller
             $employees = $request->employees;
             $selectedPeriod = $request->selected_period;
 
+            // Validate employees are from accessible offices if user has limited access
+            if (!empty($accessibleOfficeIds)) {
+                $employeeIds = collect($employees)->pluck('id')->all();
+                $employeeOffices = Employee::whereIn('id', $employeeIds)->pluck('office_id', 'id')->all();
+
+                foreach ($employeeOffices as $employeeId => $officeId) {
+                    if (!in_array($officeId, $accessibleOfficeIds)) {
+                        DB::rollBack();
+                        return response()->json([
+                            'message' => 'Anda tidak memiliki akses untuk menambahkan pegawai dari office ini',
+                        ], 403);
+                    }
+                }
+            }
+
             $newWorkScheduleItemsPayload = [];
-            collect($employees)->each(function ($employee) use ($selectedPeriod, $newWorkSchedule, &$newWorkScheduleItemsPayload) {
-                collect($selectedPeriod)->each(function ($period, $index) use ($newWorkSchedule, &$newWorkScheduleItemsPayload, $employee) {
+            collect($employees)->each(function ($employee) use ($selectedPeriod, $newWorkSchedule, $accessibleOfficeIds, &$newWorkScheduleItemsPayload) {
+                collect($selectedPeriod)->each(function ($period, $index) use ($newWorkSchedule, $accessibleOfficeIds, &$newWorkScheduleItemsPayload, $employee) {
                     if (!empty(($employee['schedules'][$index]['work_schedule_working_pattern_id'] ?? null))) {
+                        $officeId = $employee['schedules'][$index]['office_id'] ?? null;
+
+                        // Validate office_id is in accessible offices if user has limited access
+                        if (!empty($accessibleOfficeIds) && $officeId && !in_array($officeId, $accessibleOfficeIds)) {
+                            return; // Skip this item if office is not accessible
+                        }
+
                         $payload = [
                             'date' => $period['date'],
                             'employee_id' => $employee['id'],
-                            'office_id' => $employee['schedules'][$index]['office_id'] ?? null,
+                            'office_id' => $officeId,
                             'work_schedule_id' => $newWorkSchedule->id,
                             'created_at' => Carbon::now()->toDateTimeString(),
                             'updated_at' => Carbon::now()->toDateTimeString(),
@@ -258,9 +325,21 @@ class WorkScheduleController extends Controller
      */
     public function show($id)
     {
-        $workSchedule = WorkSchedule::with(['items' => function ($q) {
+        $accessibleOfficeIds = $this->getAccessibleOfficeIds();
+
+        $workScheduleQuery = WorkSchedule::with(['items' => function ($q) use ($accessibleOfficeIds) {
             $q->with(['employee'])->where('is_off', 0);
-        }])->find($id);
+            // Filter items by accessible offices if user has limited access
+            if (!empty($accessibleOfficeIds)) {
+                $q->whereIn('office_id', $accessibleOfficeIds);
+            }
+        }]);
+
+        $workSchedule = $workScheduleQuery->find($id);
+
+        if (!$workSchedule) {
+            abort(404);
+        }
 
         $employeeIds = collect($workSchedule->items)->pluck('employee_id')->unique()->all();
 
@@ -270,7 +349,14 @@ class WorkScheduleController extends Controller
 
         $workScheduleWorkingPatterns = WorkScheduleWorkingPattern::all();
 
-        $offices = Office::all();
+        $officesQuery = Office::query();
+
+        // Filter offices by accessible offices if user has limited access
+        if (!empty($accessibleOfficeIds)) {
+            $officesQuery->whereIn('id', $accessibleOfficeIds);
+        }
+
+        $offices = $officesQuery->get();
 
         $groupedWorkScheduleItems = collect($workSchedule->items)->groupBy(['office_id', 'work_schedule_working_pattern_id', 'date']);
         // $workSchedule->grouped_schedule_items = $groupedWorkScheduleItems;
@@ -297,14 +383,42 @@ class WorkScheduleController extends Controller
      */
     public function edit($id)
     {
-        $workSchedule = WorkSchedule::with(['items.employee'])->findOrFail($id);
+        $accessibleOfficeIds = $this->getAccessibleOfficeIds();
+
+        $workScheduleQuery = WorkSchedule::with(['items' => function ($q) use ($accessibleOfficeIds) {
+            $q->with(['employee']);
+            // Filter items by accessible offices if user has limited access
+            if (!empty($accessibleOfficeIds)) {
+                $q->whereIn('office_id', $accessibleOfficeIds);
+            }
+        }]);
+
+        $workSchedule = $workScheduleQuery->findOrFail($id);
+
         $companies = Company::all();
         $workScheduleWorkingPatterns = WorkScheduleWorkingPattern::all();
-        $usedWorkScheduleDates = WorkSchedule::all()->flatMap(function ($workSchedule) {
+
+        $usedWorkScheduleQuery = WorkSchedule::query();
+
+        // Filter work schedules by accessible offices if user has limited access
+        if (!empty($accessibleOfficeIds)) {
+            $usedWorkScheduleQuery->whereHas('items', function ($q) use ($accessibleOfficeIds) {
+                $q->whereIn('office_id', $accessibleOfficeIds);
+            });
+        }
+
+        $usedWorkScheduleDates = $usedWorkScheduleQuery->get()->flatMap(function ($workSchedule) {
             return $this->getDatesFromRange($workSchedule->start_date, $workSchedule->end_date);
         })->all();
 
-        $offices = Office::all();
+        $officesQuery = Office::query();
+
+        // Filter offices by accessible offices if user has limited access
+        if (!empty($accessibleOfficeIds)) {
+            $officesQuery->whereIn('id', $accessibleOfficeIds);
+        }
+
+        $offices = $officesQuery->get();
 
         return view('work-schedule.edit', [
             'work_schedule' => $workSchedule,
@@ -340,20 +454,35 @@ class WorkScheduleController extends Controller
                 ], 400);
             }
 
-            $workSchedule = WorkSchedule::with(['items' => function ($q) {
+            $accessibleOfficeIds = $this->getAccessibleOfficeIds();
+
+            $workScheduleQuery = WorkSchedule::with(['items' => function ($q) use ($accessibleOfficeIds) {
                 $q->orderBy('id', 'DESC');
-            }])->findOrFail($workScheduleId);
+                // Filter items by accessible offices if user has limited access
+                if (!empty($accessibleOfficeIds)) {
+                    $q->whereIn('office_id', $accessibleOfficeIds);
+                }
+            }]);
+
+            $workSchedule = $workScheduleQuery->findOrFail($workScheduleId);
             $groupedWorkScheduleItems = collect($workSchedule->items)->groupBy(['employee_id', 'date'])->all();
 
             // return $groupedWorkScheduleItems;
 
-            $employees = Employee::with([
+            $employeesQuery = Employee::with([
                 'office',
                 'activeCareer.jobTitle',
                 'salaryComponents' => function ($q) {
                     $q->orderBy('employee_salary_component.id', 'DESC')->orderBy('employee_salary_component.effective_date', 'DESC');
                 },
-            ])->where('aerplus_daily_salary', 1)->where('active', 1)->get();
+            ])->where('aerplus_daily_salary', 1)->where('active', 1);
+
+            // Filter employees by accessible offices if user has limited access
+            if (!empty($accessibleOfficeIds)) {
+                $employeesQuery->whereIn('office_id', $accessibleOfficeIds);
+            }
+
+            $employees = $employeesQuery->get();
 
             // return collect($employees[0])->except(['attendances', 'salary_components'])->all();
 
@@ -414,19 +543,43 @@ class WorkScheduleController extends Controller
     {
         DB::beginTransaction();
         try {
+            $accessibleOfficeIds = $this->getAccessibleOfficeIds();
+
             $workSchedule = WorkSchedule::find($id);
 
             $employees = $request->employees;
             $selectedPeriod = $request->selected_period;
 
+            // Validate employees are from accessible offices if user has limited access
+            if (!empty($accessibleOfficeIds)) {
+                $employeeIds = collect($employees)->pluck('id')->all();
+                $employeeOffices = Employee::whereIn('id', $employeeIds)->pluck('office_id', 'id')->all();
+
+                foreach ($employeeOffices as $employeeId => $officeId) {
+                    if (!in_array($officeId, $accessibleOfficeIds)) {
+                        DB::rollBack();
+                        return response()->json([
+                            'message' => 'Anda tidak memiliki akses untuk mengupdate pegawai dari office ini',
+                        ], 403);
+                    }
+                }
+            }
+
             $workScheduleItemsPayload = [];
-            collect($employees)->each(function ($employee) use ($selectedPeriod, $workSchedule, &$workScheduleItemsPayload) {
-                collect($selectedPeriod)->each(function ($period, $index) use ($workSchedule, &$workScheduleItemsPayload, $employee) {
+            collect($employees)->each(function ($employee) use ($selectedPeriod, $workSchedule, $accessibleOfficeIds, &$workScheduleItemsPayload) {
+                collect($selectedPeriod)->each(function ($period, $index) use ($workSchedule, $accessibleOfficeIds, &$workScheduleItemsPayload, $employee) {
                     if (!empty(($employee['schedules'][$index]['work_schedule_working_pattern_id'] ?? null))) {
+                        $officeId = $employee['schedules'][$index]['office_id'] ?? null;
+
+                        // Validate office_id is in accessible offices if user has limited access
+                        if (!empty($accessibleOfficeIds) && $officeId && !in_array($officeId, $accessibleOfficeIds)) {
+                            return; // Skip this item if office is not accessible
+                        }
+
                         $payload = [
                             'date' => $period['date'],
                             'employee_id' => $employee['id'],
-                            'office_id' => $employee['schedules'][$index]['office_id'] ?? null,
+                            'office_id' => $officeId,
                             'work_schedule_id' => $workSchedule->id,
                             'created_at' => Carbon::now()->toDateTimeString(),
                             'updated_at' => Carbon::now()->toDateTimeString(),
@@ -522,13 +675,21 @@ class WorkScheduleController extends Controller
                 throw new Error('params "id" are required');
             }
 
-            $workSchedule = WorkSchedule::with(['items' => function ($q) {
+            $accessibleOfficeIds = $this->getAccessibleOfficeIds();
+
+            $workScheduleQuery = WorkSchedule::with(['items' => function ($q) use ($accessibleOfficeIds) {
                 $q->with(['employee' => function ($q2) {
                     $q2->with(['salaryComponents' => function ($q) {
                         $q->orderBy('employee_salary_component.id', 'DESC')->orderBy('employee_salary_component.effective_date', 'DESC');
                     }, 'activeCareer.jobTitle']);
                 }, 'office', 'workScheduleWorkingPattern'])->orderBy('id', 'DESC');
-            }])->findOrFail($id);
+                // Filter items by accessible offices if user has limited access
+                if (!empty($accessibleOfficeIds)) {
+                    $q->whereIn('office_id', $accessibleOfficeIds);
+                }
+            }]);
+
+            $workSchedule = $workScheduleQuery->findOrFail($id);
 
             $employeeIds = collect($workSchedule->items)->pluck('employee_id')->unique()->all();
 
@@ -538,7 +699,14 @@ class WorkScheduleController extends Controller
 
             $groupedWorkScheduleItems = collect($workSchedule->items)->groupBy(['employee_id', 'date'])->all();
 
-            $employees = Employee::where('active', 1)->orderBy('name', 'ASC')->get()->map(function ($employee) use ($groupedWorkScheduleItems, $periods) {
+            $employeesQuery = Employee::where('active', 1)->orderBy('name', 'ASC');
+
+            // Filter employees by accessible offices if user has limited access
+            if (!empty($accessibleOfficeIds)) {
+                $employeesQuery->whereIn('office_id', $accessibleOfficeIds);
+            }
+
+            $employees = $employeesQuery->get()->map(function ($employee) use ($groupedWorkScheduleItems, $periods) {
                 $schedules = collect($periods)->map(function ($date) use ($groupedWorkScheduleItems, $employee) {
                     return $groupedWorkScheduleItems[$employee->id][$date][0] ?? null;
                 })->all();
@@ -586,11 +754,19 @@ class WorkScheduleController extends Controller
                 throw new Error('params "id" are required');
             }
 
-            $workSchedule = WorkSchedule::with(['items' => function ($q) {
+            $accessibleOfficeIds = $this->getAccessibleOfficeIds();
+
+            $workScheduleQuery = WorkSchedule::with(['items' => function ($q) use ($accessibleOfficeIds) {
                 $q->with(['employee' => function ($q2) {
                     $q2->with(['activeCareer.jobTitle']);
                 }, 'office', 'workScheduleWorkingPattern'])->orderBy('id', 'DESC');
-            }])->findOrFail($id);
+                // Filter items by accessible offices if user has limited access
+                if (!empty($accessibleOfficeIds)) {
+                    $q->whereIn('office_id', $accessibleOfficeIds);
+                }
+            }]);
+
+            $workSchedule = $workScheduleQuery->findOrFail($id);
 
             $employeeIds = collect($workSchedule->items)->pluck('employee_id')->unique()->all();
 
@@ -602,7 +778,14 @@ class WorkScheduleController extends Controller
 
             $workScheduleWorkingPatterns = WorkScheduleWorkingPattern::orderBy('start_time')->orderBy('end_time')->orderBy('id')->get();
 
-            $offices = Office::all()->map(function ($office) use ($periods, $groupedWorkScheduleItems, $workScheduleWorkingPatterns) {
+            $officesQuery = Office::query();
+
+            // Filter offices by accessible offices if user has limited access
+            if (!empty($accessibleOfficeIds)) {
+                $officesQuery->whereIn('id', $accessibleOfficeIds);
+            }
+
+            $offices = $officesQuery->get()->map(function ($office) use ($periods, $groupedWorkScheduleItems, $workScheduleWorkingPatterns) {
                 $periods = collect($periods)->map(function ($date) use ($groupedWorkScheduleItems, $workScheduleWorkingPatterns, $office) {
                     $schedules = collect($workScheduleWorkingPatterns)->map(function ($workScheduleWorkingPattern) use ($groupedWorkScheduleItems, $date, $office) {
                         return $groupedWorkScheduleItems[$office->id][$date][$workScheduleWorkingPattern->id] ?? null;

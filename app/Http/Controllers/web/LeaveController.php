@@ -354,7 +354,8 @@ class LeaveController extends Controller
     public function reset()
     {
         try {
-            $startDate = date('Y-01-01');
+            // $startDate = date('Y-01-01');
+            $startDate = date('Y-m-d');
             $endDate = date('Y-12-t');
             $employees = Employee::all()->map(function ($employee) use ($startDate, $endDate) {
                 // Leave remainings

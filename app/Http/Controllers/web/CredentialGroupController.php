@@ -411,7 +411,26 @@ class CredentialGroupController extends Controller
      */
     public function destroy($id)
     {
-        //
+        try {
+            $credentialGroup = CredentialGroup::findOrFail($id);
+
+            // Check if there are credentials using this group
+            // if ($credentialGroup->credentials()->count() > 0) {
+            //     return response()->json([
+            //         'message' => 'Grup tidak dapat dihapus karena masih digunakan oleh beberapa kredensial',
+            //     ], 422);
+            // }
+
+            $credentialGroup->delete();
+
+            return response()->json([
+                'message' => 'Data grup berhasil dihapus',
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => 'Data gagal dihapus - ' . $e->getMessage(),
+            ], 500);
+        }
     }
 
     /**

@@ -173,7 +173,7 @@ $permissions = json_decode($groupPermissions);
 
                 $canViewTimeOff = Auth::user()->can('view', App\Models\SickApplication::class) || Auth::user()->can('view', App\Models\LeaveApplication::class);
 
-                $hasAttendanceGroupPermission = auth()->user()->can('view', App\Models\Attendance::class) || auth()->user()->can('create', App\Models\Attendance::class) || $canViewTimeOff || auth()->user()->can('view', App\Models\Leave::class) || auth()->user()->can('view', App\Models\WorkingPattern::class);
+                $hasAttendanceGroupPermission = auth()->user()->can('view', App\Models\Attendance::class) || auth()->user()->can('create', App\Models\Attendance::class) || $canViewTimeOff || auth()->user()->can('view', App\Models\Leave::class) || auth()->user()->can('view', App\Models\WorkingPattern::class) || in_array('view_work_schedule', $permissions);
                 ?>
                 @if($hasAttendanceGroupPermission)
                 <div data-kt-menu-trigger="click" class="menu-item <?= $isAttendanceRouteGroup ? 'show here' : '' ?> menu-accordion">

@@ -187,6 +187,34 @@
         methods: {
             async onSubmit() {
                 let self = this;
+                
+                // Validasi form
+                if (!self.model.employeeId) {
+                    toastr.error('Pilih pegawai terlebih dahulu');
+                    return;
+                }
+                if (!self.model.type) {
+                    toastr.error('Pilih jenis SP terlebih dahulu');
+                    return;
+                }
+
+                // Konfirmasi dengan SweetAlert2
+                const result = await Swal.fire({
+                    title: 'Konfirmasi',
+                    text: 'Apakah Anda yakin ingin menyimpan surat peringatan ini?',
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonText: 'Ya, Simpan',
+                    cancelButtonText: 'Batal',
+                    confirmButtonColor: '#3085d6',
+                    cancelButtonColor: '#d33',
+                    reverseButtons: true
+                });
+
+                if (!result.isConfirmed) {
+                    return;
+                }
+
                 try {
                     const {
                         employeeId,

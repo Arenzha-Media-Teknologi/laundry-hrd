@@ -77,13 +77,13 @@ $permissions = json_decode($groupPermissions);
                                 <span>Rekap Detail</span>
                             </a> -->
                             <div class="btn-group me-2">
-                                <button type="button" class="btn btn-light-primary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                <button type="button" class="btn btn-success btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
                                     <i class="bi bi-download"></i>
-                                    <span>Rekapitulasi</span>
+                                    <span>Export</span>
                                 </button>
                                 <ul class="dropdown-menu">
-                                    <li><a class="dropdown-item" href="/work-schedules/export/by-employee?id={{ $schedule->id }}" target="_blank">Pegawai</a></li>
-                                    <li><a class="dropdown-item" href="/work-schedules/export/by-office?id={{ $schedule->id }}" target="_blank">Outlet</a></li>
+                                    <li><a class="dropdown-item" href="/work-schedules/export/by-employee?id={{ $schedule->id }}" target="_blank">By Pegawai</a></li>
+                                    <li><a class="dropdown-item" href="/work-schedules/export/by-office?id={{ $schedule->id }}" target="_blank">By Outlet</a></li>
                                 </ul>
                             </div>
                             @if(in_array('delete_work_schedule', $permissions))

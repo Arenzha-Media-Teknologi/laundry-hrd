@@ -647,9 +647,9 @@
 
                         // const data = response?.data?.data;
                         toastr.success(message);
-                        // setTimeout(() => {
-                        //     window.location.reload();
-                        // }, 500);
+                        setTimeout(() => {
+                            window.location.href = '/work-schedules';
+                        }, 500);
                     }
                 } catch (error) {
                     let message = error?.response?.data?.message;

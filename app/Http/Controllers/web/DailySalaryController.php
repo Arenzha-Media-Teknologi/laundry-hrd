@@ -768,7 +768,7 @@ class DailySalaryController extends Controller
                 //     $lateCharge = $employeeWage['daily'];
                 // }
                 $LATE_FEE_PER_DAY = 20000;
-                if ($employee->type = "staff") {
+                if ($employee->type == "staff") {
                     $LATE_FEE_PER_DAY = 30000;
                 }
 

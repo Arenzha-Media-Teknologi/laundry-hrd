@@ -656,19 +656,35 @@ class EmployeeApiController extends Controller
     {
         try {
             $validated = $request->validate([
-                'password' => 'required|string',
+                'current_password' => 'required|string',
+                'password' => 'required|string|min:6|confirmed',
             ]);
-            $newPassword = $request->password;
 
             $credential = Credential::query()->where('employee_id', $id)->first();
-            $credential->password = Hash::make($newPassword);
+            if (!$credential) {
+                return response()->json([
+                    'message' => 'Credential not found',
+                    'error' => true,
+                    'code' => 404,
+                ], 404);
+            }
+
+            if (!Hash::check($validated['current_password'], $credential->password)) {
+                return response()->json([
+                    'message' => 'Password lama salah',
+                    'error' => true,
+                    'code' => 422,
+                ], 422);
+            }
+
+            $credential->password = Hash::make($validated['password']);
             $credential->save();
 
             return response()->json([
                 'message' => 'OK',
                 'error' => false,
                 'code' => 200,
-                'data' => $credential,
+                'data' => collect($credential)->except(['password'])->all(),
             ]);
         } catch (\Throwable $e) {
             return response()->json([
@@ -861,6 +877,8 @@ class EmployeeApiController extends Controller
                     'clock_out_note' => null,
                     'time_late' => "0",
                     'events' => $events,
+                    'is_long_shift' => false,
+                    'long_shift_status' => null,
                 ];
 
                 if ($attendance !== null) {

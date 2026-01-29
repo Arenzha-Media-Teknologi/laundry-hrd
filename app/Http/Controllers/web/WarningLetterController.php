@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\web;
 
 use App\Http\Controllers\Controller;
+use App\Models\Attendance;
 use App\Models\Employee;
 use App\Models\WarningLetter;
 use App\Models\WarningLetterAttachment;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use PDF;
 
@@ -202,6 +204,162 @@ class WarningLetterController extends Controller
                 'message' => 'Data gagal dihapus - ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Auto-create warning letter from "Pegawai Terlambat Bulan Berjalan" dashboard widget.
+     *
+     * Rules:
+     * - three_times_late: create SP1 for 3 months, description mentions 3 times late
+     * - two_times_late_sp1: create SP1 for 2 months, description mentions 2 times late
+     * - one_time_late_sp2: create SP3 for 1 day, description mentions 1 time late, and deactivate employee immediately
+     */
+    public function autoFromLate(Request $request)
+    {
+        $validated = $request->validate([
+            'employee_id' => 'required|integer|exists:employees,id',
+            'late_count' => 'required|integer|min:1',
+            'dates' => 'nullable|array',
+            'dates.*' => 'nullable|date',
+            'mode' => 'required|string|in:three_times_late,two_times_late_sp1,one_time_late_sp2',
+        ]);
+
+        $employeeId = (int) $validated['employee_id'];
+        $lateCount = (int) $validated['late_count'];
+        $mode = $validated['mode'];
+        $dates = collect($validated['dates'] ?? [])->filter()->values()->all();
+
+        $today = Carbon::now()->startOfDay();
+        $startOfMonth = $today->copy()->startOfMonth();
+        $endOfMonth = $today->copy()->endOfMonth();
+
+        return DB::transaction(function () use ($employeeId, $lateCount, $mode, $dates, $today, $startOfMonth, $endOfMonth) {
+            $employee = Employee::lockForUpdate()->findOrFail($employeeId);
+
+            $type = null;
+            $effectiveStartDate = $today->toDateString();
+            $effectiveEndDate = null;
+            $description = null;
+
+            if ($mode === 'three_times_late') {
+                $type = 'sp1';
+                $effectiveEndDate = $today->copy()->addMonthsNoOverflow(3)->toDateString();
+                $description = 'Terlambat ' . $lateCount . ' kali pada bulan ' . Carbon::now()->locale('id')->isoFormat('MMMM YYYY') . '.';
+            } elseif ($mode === 'two_times_late_sp1') {
+                $type = 'sp1';
+                $effectiveEndDate = $today->copy()->addMonthsNoOverflow(2)->toDateString();
+                $description = 'Terlambat ' . $lateCount . ' kali pada bulan ' . Carbon::now()->locale('id')->isoFormat('MMMM YYYY') . '.';
+            } elseif ($mode === 'one_time_late_sp2') {
+                $type = 'sp3';
+                $effectiveEndDate = $today->copy()->addDay()->toDateString();
+                $description = 'Terlambat ' . $lateCount . ' kali saat dalam masa SP2 pada bulan ' . Carbon::now()->locale('id')->isoFormat('MMMM YYYY') . '.';
+            }
+
+            if (!empty($dates)) {
+                $dateText = collect($dates)->map(function ($d) {
+                    try {
+                        return Carbon::parse($d)->locale('id')->isoFormat('DD MMM');
+                    } catch (\Throwable $th) {
+                        return null;
+                    }
+                })->filter()->implode(', ');
+
+                if (!empty($dateText)) {
+                    $description .= ' Tanggal terlambat: ' . $dateText . '.';
+                }
+            }
+
+            // Guard: do not create duplicate letter of same type in current month
+            $existsThisMonth = WarningLetter::where('employee_id', $employeeId)
+                ->where('type', $type)
+                ->whereBetween('effective_start_date', [$startOfMonth->toDateString(), $endOfMonth->toDateString()])
+                ->exists();
+
+            if ($existsThisMonth) {
+                return response()->json([
+                    'message' => 'Surat peringatan (' . strtoupper($type) . ') untuk pegawai ini sudah dibuat di bulan berjalan.',
+                ], 422);
+            }
+
+            // Guard: prevent creating SP1 if an active SP1 exists
+            if ($type === 'sp1') {
+                $hasActiveSp1 = WarningLetter::where('employee_id', $employeeId)
+                    ->where('type', 'sp1')
+                    ->where('effective_start_date', '<=', $today->toDateString())
+                    ->where('effective_end_date', '>=', $today->toDateString())
+                    ->exists();
+                if ($hasActiveSp1) {
+                    return response()->json([
+                        'message' => 'Pegawai masih memiliki SP1 aktif.',
+                    ], 422);
+                }
+            }
+
+            // Guard: SP3 requires active SP2
+            if ($type === 'sp3') {
+                $hasActiveSp2 = WarningLetter::where('employee_id', $employeeId)
+                    ->where('type', 'sp2')
+                    ->where('effective_start_date', '<=', $today->toDateString())
+                    ->where('effective_end_date', '>=', $today->toDateString())
+                    ->exists();
+                if (!$hasActiveSp2) {
+                    return response()->json([
+                        'message' => 'SP3 hanya dapat dibuat jika pegawai masih dalam masa SP2.',
+                    ], 422);
+                }
+            }
+
+            $warningLetter = new WarningLetter();
+            $warningLetter->employee_id = $employeeId;
+            $warningLetter->number = $this->generateWarningLetterNumber($type, $employeeId, $effectiveStartDate);
+            $warningLetter->effective_start_date = $effectiveStartDate;
+            $warningLetter->effective_end_date = $effectiveEndDate;
+            $warningLetter->type = $type;
+            $warningLetter->description = $description;
+            $warningLetter->signatory = null;
+            $warningLetter->save();
+
+            // Mark attendances as counted for warning letter
+            // Only mark attendances that haven't been marked yet (both warning_letter_created_at and warning_letter_type are null)
+            if (!empty($dates)) {
+                Attendance::where('employee_id', $employeeId)
+                    ->where('time_late', '>', 0)
+                    ->where('status', 'hadir')
+                    ->whereIn('date', $dates)
+                    ->whereNull('warning_letter_created_at')
+                    ->whereNull('warning_letter_type')
+                    ->update([
+                        'warning_letter_created_at' => Carbon::now(),
+                        'warning_letter_type' => $type
+                    ]);
+            } else {
+                // If no specific dates provided, mark all late attendances in current month that haven't been marked
+                Attendance::where('employee_id', $employeeId)
+                    ->where('time_late', '>', 0)
+                    ->where('status', 'hadir')
+                    ->whereBetween('date', [$startOfMonth->toDateString(), $endOfMonth->toDateString()])
+                    ->whereNull('warning_letter_created_at')
+                    ->whereNull('warning_letter_type')
+                    ->update([
+                        'warning_letter_created_at' => Carbon::now(),
+                        'warning_letter_type' => $type
+                    ]);
+            }
+
+            // If SP3: deactivate employee immediately
+            if ($type === 'sp3') {
+                $employee->active = 0;
+                $employee->inactive_at = Carbon::now();
+                $employee->save();
+            }
+
+            $warningLetter->load(['employee', 'signatoryEmployee', 'attachments']);
+
+            return response()->json([
+                'message' => 'Surat peringatan berhasil dibuat otomatis (' . strtoupper($type) . ').',
+                'data' => $warningLetter,
+            ]);
+        });
     }
 
     /**

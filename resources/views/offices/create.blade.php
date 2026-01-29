@@ -100,6 +100,16 @@
                         <textarea v-model="model.address" class="form-control mb-2" rows="5" placeholder="Masukkan alamat"></textarea>
                         <!--end::Input-->
                     </div>
+                    <!--end::Input group-->
+                    <!--begin::Input group-->
+                    <div class="mb-10 fv-row fv-plugins-icon-container">
+                        <!--begin::Label-->
+                        <label class="form-label">Jam Buka</label>
+                        <!--end::Label-->
+                        <!--begin::Input-->
+                        <input type="time" v-model="model.openingTime" class="form-control mb-2" placeholder="Masukkan jam buka">
+                        <!--end::Input-->
+                    </div>
                     <div class="separator"></div>
                     <!--end::Input group-->
                     <h2 class="my-10">Detail Lokasi</h2>
@@ -212,6 +222,7 @@
                     name: '',
                     phone: '',
                     address: '',
+                    openingTime: '',
                     latitude: -6.200000,
                     longitude: 106.816666,
                 },
@@ -247,6 +258,7 @@
                         name,
                         phone,
                         address,
+                        openingTime,
                         latitude,
                         longitude
                     } = self.model;
@@ -259,6 +271,7 @@
                         name,
                         phone,
                         address,
+                        opening_time: openingTime,
                         latitude,
                         longitude,
                     });

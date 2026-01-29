@@ -33,6 +33,16 @@
             <p class="text-muted mb-0">Detail Jadwal Kerja Pegawai</p>
         </div>
         <div class="d-flex">
+            <div class="btn-group me-3">
+                <button type="button" class="btn btn-success btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-download"></i>
+                    <span>Export (.xlsx)</span>
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="/work-schedules/export/by-employee?id={{ $work_schedule->id }}" target="_blank">By Pegawai</a></li>
+                    <li><a class="dropdown-item" href="/work-schedules/export/by-office?id={{ $work_schedule->id }}" target="_blank">By Outlet</a></li>
+                </ul>
+            </div>
             <button class="btn btn-dark me-3" data-bs-toggle="collapse" data-bs-target=".collapseSchedule" aria-expanded="false" aria-controls="collapseSchedule"><i class="bi bi-chevron-down"></i> Semua</button>
             <a href="/work-schedules/{{ $work_schedule->id }}/edit" class="btn btn-primary"><i class="bi bi-pencil"></i> Ubah</a>
         </div>

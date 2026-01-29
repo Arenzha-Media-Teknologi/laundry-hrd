@@ -20,7 +20,9 @@ class OfficeController extends Controller
      */
     public function index()
     {
-        $offices = Office::with(['division.company'])->get();
+        $offices = Office::with(['division.company'])
+            ->withCount('employees')
+            ->get();
 
         return view('offices.index', [
             'offices' => $offices,
@@ -108,6 +110,7 @@ class OfficeController extends Controller
             $name = $request->name;
             $phone = $request->phone;
             $address = $request->address;
+            $openingTime = $request->opening_time;
             $latitude = $request->latitude;
             $longitude = $request->longitude;
 
@@ -123,6 +126,7 @@ class OfficeController extends Controller
                 ],
                 'phone' => 'max:50',
                 'address' => 'max:255',
+                'opening_time' => 'nullable|date_format:H:i',
                 'latitude' => 'required|max:50',
                 'longitude' => 'required|max:50',
             ]);
@@ -131,6 +135,7 @@ class OfficeController extends Controller
             $office->name = ucwords($name);
             $office->phone = $phone;
             $office->address = $address;
+            $office->opening_time = $openingTime;
             $office->latitude = $latitude;
             $office->longitude = $longitude;
             $office->division_id = $divisionId;
@@ -193,6 +198,7 @@ class OfficeController extends Controller
             $name = $request->name;
             $phone = $request->phone;
             $address = $request->address;
+            $openingTime = $request->opening_time;
             $latitude = $request->latitude;
             $longitude = $request->longitude;
 
@@ -210,6 +216,7 @@ class OfficeController extends Controller
                 ],
                 'phone' => 'max:50',
                 'address' => 'max:255',
+                'opening_time' => 'nullable|date_format:H:i',
                 'latitude' => 'required|max:50',
                 'longitude' => 'required|max:50',
             ]);
@@ -217,6 +224,7 @@ class OfficeController extends Controller
             $office->name = ucwords($name);
             $office->phone = $phone;
             $office->address = $address;
+            $office->opening_time = $openingTime;
             $office->latitude = $latitude;
             $office->longitude = $longitude;
             $office->division_id = $divisionId;
@@ -251,6 +259,32 @@ class OfficeController extends Controller
         } catch (Exception $e) {
             return response()->json([
                 'message' => 'Data gagal dihapus - ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Get employees for a specific office.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function getEmployees($id)
+    {
+        try {
+            $office = Office::with(['division.company'])->findOrFail($id);
+            $employees = Employee::where('office_id', $id)
+                ->where('active', 1)
+                ->with(['activeCareer.jobTitle'])
+                ->get();
+
+            return response()->json([
+                'office' => $office,
+                'employees' => $employees,
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
             ], 500);
         }
     }

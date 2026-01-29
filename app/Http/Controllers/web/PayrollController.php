@@ -435,6 +435,7 @@ class PayrollController extends Controller
             $presentDaysCount = 0;
 
             $totalTimeLate = 0;
+            $totalDayTimeLate = 0;
 
             $notClockInAttendances = [];
             $notClockOutAttendances = [];
@@ -443,7 +444,7 @@ class PayrollController extends Controller
 
             $lateDays = [];
 
-            $periods = collect($periodDates)->each(function ($date) use ($attendances, $activeWorkingPattern, $eventCalendars, &$notPresentDays, &$workingPatternDayStatus, &$presentDaysCount, &$totalTimeLate, &$notClockInAttendances, &$notClockOutAttendances, &$noStatusAttendanceDates, &$lateDays) {
+            $periods = collect($periodDates)->each(function ($date) use ($attendances, $activeWorkingPattern, $eventCalendars, &$notPresentDays, &$workingPatternDayStatus, &$presentDaysCount, &$totalTimeLate, &$totalDayTimeLate, &$notClockInAttendances, &$notClockOutAttendances, &$noStatusAttendanceDates, &$lateDays) {
                 // Resource
                 $newestAttendance = collect($attendances)->where('date', $date)->first();
                 $currentEvents = collect($eventCalendars)->filter(function ($event) use ($date) {
@@ -510,11 +511,11 @@ class PayrollController extends Controller
 
                                 $timeLate = (int) $newestAttendance['time_late'];
 
-                                if ($timeLate > 0) {
-                                    $lateDays[] = [
-                                        'date' => $date,
-                                    ];
-                                }
+                                // if ($timeLate > 0) {
+                                //     $lateDays[] = [
+                                //         'date' => $date,
+                                //     ];
+                                // }
                             }
 
                             if ($workingPatternDay['day_status'] == 'workday') {
@@ -526,6 +527,12 @@ class PayrollController extends Controller
                             if ($eventCalendarsExist) {
                                 $timeLate = 0;
                             }
+                        }
+
+                        if ($timeLate > 0) {
+                            $lateDays[] = [
+                                'date' => $date,
+                            ];
                         }
 
                         $totalTimeLate += $timeLate;
@@ -666,18 +673,18 @@ class PayrollController extends Controller
                 // }
                 $excessLeaveCharge = ($basicSalaryAmount / 25) * $excessLeave;
 
-                if ($excessLeave > 0) {
-                    $deductions = collect($deductions)->push([
-                        'name' => 'Kelebihan Cuti ' .  '(' . $excessLeave . ' Hari)',
-                        'type' => 'excess_leave',
-                        'type_amount' => $excessLeave,
-                        'type_unit' => 'day',
-                        'amount' => round($excessLeaveCharge),
-                        'remaining_leave' => $remainingLeave,
-                        'application_count' => $leaveApplicationCount,
-                        'application_dates' => $leaveApplicationDates,
-                    ])->all();
-                }
+                // if ($excessLeave > 0) {
+                //     $deductions = collect($deductions)->push([
+                //         'name' => 'Kelebihan Cuti ' .  '(' . $excessLeave . ' Hari)',
+                //         'type' => 'excess_leave',
+                //         'type_amount' => $excessLeave,
+                //         'type_unit' => 'day',
+                //         'amount' => round($excessLeaveCharge),
+                //         'remaining_leave' => $remainingLeave,
+                //         'application_count' => $leaveApplicationCount,
+                //         'application_dates' => $leaveApplicationDates,
+                //     ])->all();
+                // }
             }
             // if ($leave !== null) {
             // }
@@ -721,33 +728,35 @@ class PayrollController extends Controller
             // If Employee Staff
             if ($employee->type == "staff") {
                 if ($totalTimeLate > 0) {
-                    $latePenaltyAmount = 0;
-                    if ($totalTimeLate > 0 && $totalTimeLate <= 60) {
-                        $latePenaltyAmount = 50000;
-                    } else if ($totalTimeLate >= 61 && $totalTimeLate <= 120) {
-                        $latePenaltyAmount = 100000;
-                    } else if ($totalTimeLate >= 121 && $totalTimeLate <= 180) {
-                        $latePenaltyAmount = 150000;
-                    } else if ($totalTimeLate >= 181 && $totalTimeLate <= 240) {
-                        $latePenaltyAmount = 200000;
-                    } else if ($totalTimeLate >= 241) {
-                        $latePenaltyAmount = 250000;
-                    }
+                    $latePenaltyAmount = count($lateDays) * 30000;
+                    // $latePenaltyAmount = 3 * 30000;
+                    // $latePenaltyAmount = 0;
+                    // if ($totalTimeLate > 0 && $totalTimeLate <= 60) {
+                    //     $latePenaltyAmount = 50000;
+                    // } else if ($totalTimeLate >= 61 && $totalTimeLate <= 120) {
+                    //     $latePenaltyAmount = 100000;
+                    // } else if ($totalTimeLate >= 121 && $totalTimeLate <= 180) {
+                    //     $latePenaltyAmount = 150000;
+                    // } else if ($totalTimeLate >= 181 && $totalTimeLate <= 240) {
+                    //     $latePenaltyAmount = 200000;
+                    // } else if ($totalTimeLate >= 241) {
+                    //     $latePenaltyAmount = 250000;
+                    // }
 
-                    if ($totalTimeLate >= 300) {
-                        $previousPeriodSalary = collect($employee->salaries)->first();
-                        $previousPeriodSalaryItems = $previousPeriodSalary->items ?? [];
-                        $lateSalaryItem = collect($previousPeriodSalaryItems)->where('salary_type', 'late')->first();
-                        $lateSalaryItemAmount = $lateSalaryItem->amount ?? 0;
-                        $maxLateTimes = floor($lateSalaryItemAmount / 250000) + 1;
-                        $latePenaltyAmount = 250000 * $maxLateTimes;
-                    }
+                    // if ($totalTimeLate >= 300) {
+                    //     $previousPeriodSalary = collect($employee->salaries)->first();
+                    //     $previousPeriodSalaryItems = $previousPeriodSalary->items ?? [];
+                    //     $lateSalaryItem = collect($previousPeriodSalaryItems)->where('salary_type', 'late')->first();
+                    //     $lateSalaryItemAmount = $lateSalaryItem->amount ?? 0;
+                    //     $maxLateTimes = floor($lateSalaryItemAmount / 250000) + 1;
+                    //     $latePenaltyAmount = 250000 * $maxLateTimes;
+                    // }
 
                     $deductions = collect($deductions)->push([
-                        'name' => 'Denda Keterlambatan ' .  '(' . $totalTimeLate . ' Menit)',
+                        'name' => 'Denda Keterlambatan ' .  '(' . count($lateDays) . ' Hari)',
                         'type' => 'late',
-                        'type_amount' => $totalTimeLate,
-                        'type_unit' => 'minute',
+                        'type_amount' => count($lateDays),
+                        'type_unit' => 'day',
                         'amount' => $latePenaltyAmount,
                     ])->all();
                 }
@@ -831,7 +840,7 @@ class PayrollController extends Controller
         })->all();
 
         // return response()->json(collect($generatedSalaries)->filter(function ($salary) {
-        //     return $salary['employee']['id'] == 731;
+        //     return $salary['employee']['id'] == 271;
         // })->first());
 
         // Generated

@@ -86,8 +86,10 @@
                         <th class="ps-2">Nama</th>
                         <th>Divisi</th>
                         <th>Perusahaan</th>
+                        <th>Pegawai</th>
                         <th>Telepon</th>
                         <th>Alamat</th>
+                        <th>Jam Buka</th>
                         <th class="text-end min-w-70px pe-2">Actions</th>
                     </tr>
                     <!--end::Table row-->
@@ -111,6 +113,11 @@
                             <span class="text-gray-800" v-cloak>@{{ office?.division?.company?.name || "-" }}</span>
                         </td>
                         <!--end::Email-->
+                        <!--begin::Employees=-->
+                        <td>
+                            <span class="text-gray-800" v-cloak>@{{ office?.employees_count || 0 }}</span>
+                        </td>
+                        <!--end::Employees-->
                         <!--begin::Phone=-->
                         <td>
                             <span class="text-gray-800" v-cloak>@{{ office?.phone }}</span>
@@ -121,9 +128,27 @@
                             <span class="text-gray-800" v-cloak>@{{ office?.address }}</span>
                         </td>
                         <!--end::address=-->
+                        <!--begin::Opening Time=-->
+                        <td>
+                            <span class="text-gray-800" v-cloak>@{{ office?.opening_time || "-" }}</span>
+                        </td>
+                        <!--end::Opening Time-->
                         <!--begin::Action=-->
                         <td class="text-end pe-2">
                             <div class="d-flex justify-content-end">
+                                <button type="button" class="btn btn-sm btn-icon btn-light-primary ms-2" data-bs-toggle="modal" data-bs-target="#employees_modal" @click="openEmployeesModal(office.id)">
+                                    <!--begin::Svg Icon | path: icons/duotune/general/gen019.svg-->
+                                    <span class="svg-icon svg-icon-5 m-0">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                            <path d="M17 7C17 6.4 17.4 6 18 6C18.6 6 19 6.4 19 7C19 7.6 18.6 8 18 8C17.4 8 17 7.6 17 7Z" fill="black" />
+                                            <path opacity="0.3" d="M14 18V16H10V18C10 18.6 10.4 19 11 19H13C13.6 19 14 18.6 14 18Z" fill="black" />
+                                            <path opacity="0.3" d="M6 12C5.4 12 5 12.4 5 13V17C5 17.6 5.4 18 6 18C6.6 18 7 17.6 7 17V13C7 12.4 6.6 12 6 12Z" fill="black" />
+                                            <path opacity="0.3" d="M18 12C17.4 12 17 12.4 17 13V17C17 17.6 17.4 18 18 18C18.6 18 19 17.6 19 17V13C19 12.4 18.6 12 18 12Z" fill="black" />
+                                            <path d="M12 10C13.1 10 14 10.9 14 12C14 13.1 13.1 14 12 14C10.9 14 10 13.1 10 12C10 10.9 10.9 10 12 10ZM12 20C7.6 20 4 16.4 4 12C4 7.6 7.6 4 12 4C16.4 4 20 7.6 20 12C20 16.4 16.4 20 12 20ZM12 2C6.5 2 2 6.5 2 12C2 17.5 6.5 22 12 22C17.5 22 22 17.5 22 12C22 6.5 17.5 2 12 2Z" fill="black" />
+                                        </svg>
+                                    </span>
+                                    <!--end::Svg Icon-->
+                                </button>
                                 @can('update', App\Models\Office::class)
                                 <!--begin::Share link-->
                                 <a :href="`/offices/${office.id}/edit`" class="btn btn-sm btn-icon btn-light-info ms-2">
@@ -162,6 +187,72 @@
         <!--end::Card body-->
     </div>
     <!--end::Card-->
+    <!--begin::Modal - Employees-->
+    <div class="modal fade" tabindex="-1" id="employees_modal">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Daftar Pegawai</h5>
+                    <!--begin::Close-->
+                    <div class="btn btn-icon btn-sm btn-active-light-primary ms-2" data-bs-dismiss="modal" aria-label="Close">
+                        <span class="svg-icon svg-icon-2x">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                <rect opacity="0.5" x="6" y="17.3137" width="16" height="2" rx="1" transform="rotate(-45 6 17.3137)" fill="black"></rect>
+                                <rect x="7.41422" y="6" width="16" height="2" rx="1" transform="rotate(45 7.41422 6)" fill="black"></rect>
+                            </svg>
+                        </span>
+                    </div>
+                    <!--end::Close-->
+                </div>
+                <div class="modal-body">
+                    <div v-cloak v-if="selectedOffice">
+                        <div class="mb-5">
+                            <h6 class="text-gray-800 fw-bold mb-2">@{{ selectedOffice?.name }}</h6>
+                            <div class="text-gray-600">
+                                <div>Divisi: @{{ selectedOffice?.division?.name || '-' }}</div>
+                                <div>Perusahaan: @{{ selectedOffice?.division?.company?.name || '-' }}</div>
+                            </div>
+                        </div>
+                        <div class="separator mb-5"></div>
+                        <div v-if="loadingEmployees" class="text-center py-10">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                        <div v-else>
+                            <div v-if="employees.length === 0" class="text-center py-10 text-gray-500">
+                                Tidak ada pegawai di kantor ini
+                            </div>
+                            <div v-else>
+                                <div class="table-responsive" style="max-height: 400px;">
+                                    <table class="table table-striped table-hover">
+                                        <thead class="bg-light-primary">
+                                            <tr>
+                                                <th>No</th>
+                                                <th>Nama</th>
+                                                <th>Jabatan</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr v-for="(employee, index) in employees" :key="employee.id">
+                                                <td>@{{ index + 1 }}</td>
+                                                <td>@{{ employee.name }}</td>
+                                                <td>@{{ employee.active_career?.job_title?.name || '-' }}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Tutup</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!--end::Modal - Employees-->
 </div>
 @endsection
 
@@ -221,9 +312,39 @@
         data() {
             return {
                 offices,
+                selectedOffice: null,
+                employees: [],
+                loadingEmployees: false,
             }
         },
         methods: {
+            // EMPLOYEES METHODS
+            openEmployeesModal(officeId) {
+                const self = this;
+                self.loadingEmployees = true;
+                self.selectedOffice = null;
+                self.employees = [];
+
+                // Find office from the list
+                const office = this.offices.find(o => o.id === officeId);
+                if (office) {
+                    self.selectedOffice = office;
+                }
+
+                // Fetch employees
+                axios.get(`/offices/${officeId}/employees`)
+                    .then(function(response) {
+                        self.selectedOffice = response.data.office;
+                        self.employees = response.data.employees;
+                        self.loadingEmployees = false;
+                    })
+                    .catch(function(error) {
+                        console.error(error);
+                        let message = error?.response?.data?.message || 'Terjadi kesalahan saat mengambil data pegawai';
+                        toastr.error(message);
+                        self.loadingEmployees = false;
+                    });
+            },
             // COMPANY METHODS
             openDeleteConfirmation(id) {
                 const self = this;

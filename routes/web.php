@@ -9,6 +9,7 @@ use App\Http\Controllers\web\BankAccountController;
 use App\Http\Controllers\web\BpjsValueController;
 use App\Http\Controllers\web\CareerController;
 use App\Http\Controllers\web\CompanyController;
+use App\Http\Controllers\web\CredentialController;
 use App\Http\Controllers\web\CredentialGroupController;
 use App\Http\Controllers\web\DailySalaryController;
 use App\Http\Controllers\web\DashboardController;
@@ -24,6 +25,7 @@ use App\Http\Controllers\web\LeaveApplicationController;
 use App\Http\Controllers\web\LeaveCategoryController;
 use App\Http\Controllers\web\LeaveController;
 use App\Http\Controllers\web\LoanController;
+use App\Http\Controllers\web\DailyOutletReportController;
 use App\Http\Controllers\web\OfficeController;
 use App\Http\Controllers\web\PayrollBcaController;
 use App\Http\Controllers\web\PayrollController;
@@ -151,6 +153,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/create', 'create');
         Route::get('/move', 'move');
         Route::get('/{id}/edit', 'edit');
+        Route::get('/{id}/employees', 'getEmployees');
         Route::post('/', 'store');
         Route::post('/move', 'doMove');
         Route::post('/{id}', 'update');
@@ -240,6 +243,8 @@ Route::middleware(['auth'])->group(function () {
     // Attendance
     Route::controller(AttendanceController::class)->prefix('attendances')->group(function () {
         Route::get('/', 'index');
+        Route::get('/data', 'getData')->name('attendances.data');
+        Route::get('/export-daily-report', 'exportDailyReport')->name('attendances.export-daily-report');
         Route::get('/action/upload', 'upload');
         Route::post('/', 'store');
         Route::post('/{id}', 'update');
@@ -515,6 +520,11 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/{id}', 'destroy');
     });
 
+    // Credential - Generate SQL Queries
+    Route::controller(CredentialController::class)->prefix('credentials')->group(function () {
+        Route::get('/generate-sql', 'generateSqlQueries');
+    });
+
     // Credential Group
     Route::controller(SalaryDepositController::class)->prefix('salary-deposits')->group(function () {
         Route::get('/', 'index');
@@ -606,6 +616,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/{id}/detail', 'show');
         Route::get('/{id}/edit', 'edit');
         Route::get('/{id}/print', 'print');
+        Route::post('/auto-from-late', 'autoFromLate');
         Route::post('/', 'store');
         Route::post('/{id}', 'update');
         Route::delete('/{id}', 'destroy');
@@ -626,6 +637,12 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/store', 'store');
         Route::post('/{id}/update', 'update');
         Route::delete('/{id}', 'destroy');
+    });
+
+    // Daily Outlet Report
+    Route::controller(DailyOutletReportController::class)->prefix('daily-outlet-reports')->name('daily-outlet-reports.')->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/{officeId}', 'show')->name('show');
     });
 
     // Outlet Opening

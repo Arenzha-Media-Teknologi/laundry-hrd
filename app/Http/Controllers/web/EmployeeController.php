@@ -1476,7 +1476,7 @@ class EmployeeController extends Controller
         $employee = Employee::with(['activeCareer', 'bankAccounts', 'activeWorkingPatterns', 'credential'])->findOrFail($id);
         $workingPatterns = WorkingPattern::with(['items'])->get();
         $credentialGroups = CredentialGroup::all();
-        $aerplusOffices = Office::query()->where('division_id', 12)->get();
+        $aerplusOffices = Office::query()->get();
 
         $activeWorkingPattern = null;
         $activeWorkingPatternId = '';
@@ -1708,6 +1708,7 @@ class EmployeeController extends Controller
             'sakit' => 0,
             'izin' => 0,
             'cuti' => 0,
+            'off' => 0,
             'na' => 0,
         ];
 
@@ -1741,6 +1742,8 @@ class EmployeeController extends Controller
                         $statistics['izin'] += 1;
                     } else if ($status == 'cuti') {
                         $statistics['cuti'] += 1;
+                    } else if ($status == 'off') {
+                        $statistics['off'] += 1;
                     }
                 }
             } else {
@@ -1842,6 +1845,8 @@ class EmployeeController extends Controller
                             $statistics['izin'] += 1;
                         } else if ($status == 'cuti') {
                             $statistics['cuti'] += 1;
+                        } else if ($status == 'off') {
+                            $statistics['off'] += 1;
                         }
                     }
                 } else {

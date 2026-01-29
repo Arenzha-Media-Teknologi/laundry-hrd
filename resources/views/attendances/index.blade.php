@@ -87,6 +87,16 @@
                     </div>
                     <!--end::Completion Item-->
                     <!--begin::Completion Item-->
+                    <div class="d-flex justify-content-between align-items-center border-bottom mb-4 p-1">
+                        <div>
+                            <span class="fw-bolder fs-5 text-gray-700"><span class="bullet bullet-vertical bg-secondary me-5"></span> OFF</span>
+                        </div>
+                        <div v-cloak>
+                            <span class="fw-bolder fs-5">@{{ statistics.off || 0 }}</span>
+                        </div>
+                    </div>
+                    <!--end::Completion Item-->
+                    <!--begin::Completion Item-->
                     <div class="d-flex justify-content-between align-items-center border-bottom mb-4 border-gray-300 p-1">
                         <div>
                             <span class="fw-bolder fs-5 text-gray-700"><span class="bullet bullet-vertical me-5"></span> Tanpa Keterangan</span>
@@ -140,6 +150,19 @@
                     <!--end::Svg Icon-->Upload
                 </a>
                 @endcan
+                <?php
+                $exportParams = array_merge(request()->query(), ['date' => $date]);
+                $exportUrl = '/attendances/export-daily-report?' . http_build_query($exportParams);
+                ?>
+                <a href="{{ $exportUrl }}" class="btn btn-light-success me-3">
+                    <span class="svg-icon svg-icon-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <path opacity="0.3" d="M19 22H5C4.4 22 4 21.6 4 21V3C4 2.4 4.4 2 5 2H14L20 8V21C20 21.6 19.6 22 19 22ZM16 13H13V10C13 9.4 12.6 9 12 9C11.4 9 11 9.4 11 10V13H8C7.4 13 7 13.4 7 14C7 14.6 7.4 15 8 15H11V18C11 18.6 11.4 19 12 19C12.6 19 13 18.6 13 18V15H16C16.6 15 17 14.6 17 14C17 13.4 16.6 13 16 13Z" fill="currentColor" />
+                            <path d="M15 8H20L14 2V7C14 7.6 14.4 8 15 8Z" fill="currentColor" />
+                        </svg>
+                    </span>
+                    Export Excel
+                </a>
                 <button class="btn btn-light-primary" data-bs-toggle="collapse" href="#collapseFilter" role="button" aria-expanded="false" aria-controls="collapseFilter">
                     <span class="svg-icon svg-icon-2">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -166,6 +189,7 @@
             <div class="collapse justify-content-center" id="collapseFilter">
                 <div class="row py-3 gy-3">
                     <div class="col-md-3">
+                        <label class="form-label fw-bold mb-2">Perusahaan</label>
                         <select name="company_id" class="form-select form-select-sm" id="select-filter-company" multiple>
                             <!-- <option value="">Semua Perusahaan</option> -->
                             @foreach($companies as $company)
@@ -174,53 +198,33 @@
                         </select>
                     </div>
                     <div class="col-md-3">
+                        <label class="form-label fw-bold mb-2">Divisi</label>
                         <select name="division_id" class="form-select form-select-sm" id="select-filter-division" multiple>
                             <!-- <option value="">Semua Divisi</option> -->
                             <option v-for="division in filteredDivisions" :value="division.id">@{{ division.name }} - @{{ division?.company?.name ?? '' }}</option>
                         </select>
                     </div>
                     <div class="col-md-3">
+                        <label class="form-label fw-bold mb-2">Lokasi</label>
                         <select name="office_id" class="form-select form-select-sm" id="select-filter-office" multiple>
                             <!-- <option value="">Semua Kantor</option> -->
                             <option v-for="office in filteredOffices" :value="office.id">@{{ office.name }} - @{{ office?.division?.name }} - @{{ office?.division?.company?.name }}</option>
                         </select>
                     </div>
                     <div class="col-md-3">
-                        <select v-model="model.filter.status" name="office_id" class="form-select form-select-sm">
-                            <option value="">Semua status</option>
-                            <option value="1">Aktif</option>
-                            <option value="0">Tidak Aktif</option>
+                        <label class="form-label fw-bold mb-2">Status Kehadiran</label>
+                        <select v-model="model.filter.status" name="attendance_status" class="form-select form-select-sm">
+                            <option value="">Semua Status</option>
+                            <option value="hadir">Hadir</option>
+                            <option value="sakit">Sakit</option>
+                            <option value="izin">Izin</option>
+                            <option value="cuti">Cuti</option>
+                            <option value="off">OFF</option>
+                            <option value="na">Tanpa Keterangan</option>
                         </select>
                     </div>
-                    <!-- <div class="col-md-3">
-                        <select v-model="model.filter.companyId" name="company_id" class="form-select form-select-sm">
-                            <option value="">Semua Perusahaan</option>
-                            @foreach($companies as $company)
-                            <option value="{{ $company->id }}">{{ $company->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <select v-model="model.filter.divisionId" name="division_id" class="form-select form-select-sm">
-                            <option value="">Semua Divisi</option>
-                            <option v-for="division in filteredDivisions" :value="division.id">@{{ division.name }}</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <select v-model="model.filter.officeId" name="office_id" class="form-select form-select-sm">
-                            <option value="">Semua Kantor</option>
-                            <option v-for="office in filteredOffices" :value="office.id">@{{ office.name }}</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <select v-model="model.filter.status" name="office_id" class="form-select form-select-sm">
-                            <option value="">Semua status</option>
-                            <option value="1">Aktif</option>
-                            <option value="0">Tidak Aktif</option>
-                        </select>
-                    </div> -->
-                    <div class="col-md-3">
-                        <button type="button" class="btn btn-secondary btn-sm w-100" @click="applyFilter">Filter</button>
+                    <div class="col-md-12">
+                        <button type="button" class="btn btn-secondary btn-sm" @click="applyFilter">Filter</button>
                     </div>
                 </div>
             </div>
@@ -229,9 +233,9 @@
             $queryCompanyId = request()->query('company_id');
             $queryDivisionId = request()->query('division_id');
             $queryOfficeId = request()->query('office_id');
-            $queryStatus = request()->query('status');
+            $queryAttendanceStatus = request()->query('attendance_status');
             ?>
-            @if(isset($queryDate) || isset($queryCompanyId) || isset($queryDivisionId) || isset($queryOfficeId) || isset($queryStatus))
+            @if(isset($queryDate) || isset($queryCompanyId) || isset($queryDivisionId) || isset($queryOfficeId) || isset($queryAttendanceStatus))
             <div class="mb-5">
                 <div class="d-flex align-items-center">
                     <div class="me-3">
@@ -566,20 +570,20 @@
                         <!--end::Input group-->
                         <!--begin::Input group-->
                         <div class="row mb-7">
-                            <div class="fv-row col-md-6 fv-plugins-icon-container">
-                                <!--begin::Label-->
-                                <label class="form-label">Jumlah Lembur (Menit)</label>
-                                <!--end::Label-->
-                                <!--begin::Input-->
-                                <input type="number" v-model="model.edit.overtime" class="form-control" min="0" placeholder="Masukkan jumlah lembur">
-                                <!--end::Input-->
-                            </div>
                             <div class="fv-row col-md-6">
                                 <!--begin::Label-->
                                 <label class="form-label">Jumlah Keterlambatan (Menit)</label>
                                 <!--end::Label-->
                                 <!--begin::Input-->
                                 <input type="number" v-model="model.edit.timeLate" class="form-control" min="0" placeholder="Masukkan jumlah keterlambatan">
+                                <!--end::Input-->
+                            </div>
+                            <div class="fv-row col-md-6 fv-plugins-icon-container">
+                                <!--begin::Label-->
+                                <label class="form-label">Jumlah Lembur (Menit)</label>
+                                <!--end::Label-->
+                                <!--begin::Input-->
+                                <input type="number" v-model="model.edit.overtime" class="form-control" min="0" placeholder="Masukkan jumlah lembur">
                                 <!--end::Input-->
                             </div>
                         </div>
@@ -710,20 +714,20 @@
                         <!--end::Input group-->
                         <!--begin::Input group-->
                         <div class="row mb-7">
-                            <div class="fv-row col-md-6 fv-plugins-icon-container">
-                                <!--begin::Label-->
-                                <label class="form-label">Jumlah Lembur (Menit)</label>
-                                <!--end::Label-->
-                                <!--begin::Input-->
-                                <input type="number" v-model="model.add.overtime" class="form-control" min="0" placeholder="Masukkan jumlah lembur">
-                                <!--end::Input-->
-                            </div>
                             <div class="fv-row col-md-6">
                                 <!--begin::Label-->
                                 <label class="form-label">Jumlah Keterlambatan (Menit)</label>
                                 <!--end::Label-->
                                 <!--begin::Input-->
                                 <input type="number" v-model="model.add.timeLate" class="form-control" min="0" placeholder="Masukkan jumlah keterlambatan">
+                                <!--end::Input-->
+                            </div>
+                            <div class="fv-row col-md-6 fv-plugins-icon-container">
+                                <!--begin::Label-->
+                                <label class="form-label">Jumlah Lembur (Menit)</label>
+                                <!--end::Label-->
+                                <!--begin::Input-->
+                                <input type="number" v-model="model.add.overtime" class="form-control" min="0" placeholder="Masukkan jumlah lembur">
                                 <!--end::Input-->
                             </div>
                         </div>
@@ -994,9 +998,67 @@
             },
         },
         methods: {
+            async refreshAttendanceData() {
+                const self = this;
+                try {
+                    const {
+                        companyId,
+                        divisionId,
+                        officeId,
+                        status,
+                    } = self.model.filter;
+
+                    const date = self.date;
+                    
+                    // Build query params
+                    let queryParams = `date=${date}`;
+                    if (companyId) queryParams += `&company_id=${companyId}`;
+                    if (divisionId) queryParams += `&division_id=${divisionId}`;
+                    if (officeId) queryParams += `&office_id=${officeId}`;
+                    if (status) queryParams += `&attendance_status=${status}`;
+
+                    // Fetch updated data
+                    const response = await axios.get(`/attendances/data?${queryParams}`);
+                    
+                    if (response && response.data) {
+                        // Update employees data
+                        if (response.data.employees) {
+                            self.employees = response.data.employees;
+                        }
+                        
+                        // Update statistics
+                        if (response.data.statistics) {
+                            self.statistics = response.data.statistics;
+                            
+                            // Update chart
+                            if (window.attendanceChart) {
+                                window.attendanceChart.updateSeries([
+                                    self.statistics.hadir,
+                                    self.statistics.sakit,
+                                    self.statistics.izin,
+                                    self.statistics.cuti,
+                                    self.statistics.off || 0,
+                                    self.statistics.na
+                                ]);
+                            }
+                            
+                            // Re-initialize tooltips after data update
+                            setTimeout(() => {
+                                const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+                                tooltipTriggerList.map(function (tooltipTriggerEl) {
+                                    return new bootstrap.Tooltip(tooltipTriggerEl);
+                                });
+                            }, 100);
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error refreshing attendance data:', error);
+                }
+            },
             badgeColor(attendance) {
                 let status = attendance.status;
-                if (attendance.time_late > 0) {
+                // Jika status adalah "off", jangan ubah menjadi "telat"
+                if (status !== 'off' && attendance.time_late > 0) {
                     status = "telat";
                 }
                 // if (attendance.is_permission == 1) {
@@ -1012,6 +1074,8 @@
                         return 'badge-primary';
                     case 'cuti':
                         return 'badge-info';
+                    case 'off':
+                        return 'badge-secondary';
                     case 'telat':
                         return 'badge-danger';
                     default:
@@ -1023,7 +1087,8 @@
                 // if (attendance.is_permission == 1) {
                 //     status = "izin";
                 // }
-                if (attendance.time_late > 0) {
+                // Jika status adalah "off", jangan ubah menjadi "telat"
+                if (status !== 'off' && attendance.time_late > 0) {
                     status = "telat";
                 }
 
@@ -1036,6 +1101,8 @@
                         return 'Izin';
                     case 'cuti':
                         return 'Cuti';
+                    case 'off':
+                        return 'OFF';
                     case 'telat':
                         return 'Telat';
                     default:
@@ -1097,11 +1164,11 @@
                         }
 
                         const data = response?.data?.data;
-                        // if (data.employees) {
-                        //     self.employees = data.employees;
-                        // }
                         closeModal('#modalAddAttendance');
                         toastr.success(message);
+                        
+                        // Refresh table data without reload
+                        self.refreshAttendanceData();
                     }
                 } catch (error) {
                     let message = error?.response?.data?.message;
@@ -1161,11 +1228,11 @@
                         }
 
                         const data = response?.data?.data;
-                        // if (data.employees) {
-                        //     self.employees = data.employees;
-                        // }
                         closeModal('#modalEditAttendance');
                         toastr.success(message);
+                        
+                        // Refresh table data without reload
+                        self.refreshAttendanceData();
                     }
                 } catch (error) {
                     let message = error?.response?.data?.message;
@@ -1179,6 +1246,21 @@
             },
             onOpenAddModal(employeeId) {
                 const self = this;
+                
+                // Reset form to default values
+                self.model.add = {
+                    employee: null,
+                    employeeId: '',
+                    workingPatternId: '',
+                    status: 'hadir',
+                    clockInAt: '',
+                    clockOutAt: '',
+                    overtime: 0,
+                    timeLate: 0,
+                    isLongShift: 0,
+                    longShiftStatus: '',
+                };
+                
                 if (employeeId) {
                     const [employee] = self.employees.filter(employee => employee.id == employeeId);
                     if (employee) {
@@ -1213,8 +1295,14 @@
             openDeleteConfirmation(id) {
                 const self = this;
                 Swal.fire({
-                    title: 'Apakah anda yakin?',
-                    text: "Data akan dihapus",
+                    title: 'Pilih jenis penghapusan',
+                    html: `
+                        <select id="deleteType" class="form-select form-select-lg mb-3">
+                            <option value="all">Clock In & Clock Out (Hapus seluruh data)</option>
+                            <option value="clock_in">Clock In saja</option>
+                            <option value="clock_out">Clock Out saja</option>
+                        </select>
+                    `,
                     icon: 'warning',
                     reverseButtons: true,
                     showCancelButton: true,
@@ -1226,23 +1314,33 @@
                     },
                     showLoaderOnConfirm: true,
                     preConfirm: () => {
-                        return self.sendDeleteRequest(id);
+                        const deleteType = document.getElementById('deleteType').value;
+                        if (!deleteType) {
+                            Swal.showValidationMessage('Pilih jenis penghapusan');
+                            return false;
+                        }
+                        return self.sendDeleteRequest(id, deleteType);
                     },
                     allowOutsideClick: () => !Swal.isLoading(),
                     backdrop: true,
                 })
             },
-            sendDeleteRequest(id) {
+            sendDeleteRequest(id, deleteType) {
                 const self = this;
-                return axios.delete('/attendances/' + id)
+                return axios.delete('/attendances/' + id, {
+                    params: {
+                        delete_type: deleteType
+                    }
+                })
                     .then(function(response) {
                         let message = response?.data?.message;
                         if (!message) {
-                            message = 'Data berhasil disimpan'
+                            message = 'Data berhasil dihapus'
                         }
-                        // self.deleteCompany(id);
-                        // redrawDatatable();
                         toastr.success(message);
+                        
+                        // Refresh table data without reload
+                        self.refreshAttendanceData();
                     })
                     .catch(function(error) {
                         console.error(error)
@@ -1263,7 +1361,7 @@
                 } = this.model.filter;
 
                 const date = this.date;
-                const url = `/attendances?date=${date}&company_id=${companyId}&division_id=${divisionId}&office_id=${officeId}&status=${status}`;
+                const url = `/attendances?date=${date}&company_id=${companyId}&division_id=${divisionId}&office_id=${officeId}&attendance_status=${status}`;
                 window.location.href = url;
             }
         },
@@ -1324,6 +1422,7 @@
         info: KTUtil.getCssVariableValue('--bs-info'),
         warning: KTUtil.getCssVariableValue('--bs-warning'),
         light: KTUtil.getCssVariableValue('--bs-dark'),
+        secondary: KTUtil.getCssVariableValue('--bs-secondary'),
     }
     var options = {
         chart: {
@@ -1339,13 +1438,21 @@
         legend: {
             show: false
         },
-        series: [statistics.hadir, statistics.sakit, statistics.izin, statistics.cuti, statistics.na],
-        labels: ['Hadir', 'Sakit', 'Izin', 'Cuti', 'Tanpa Keterangan'],
-        colors: [bgColor.success, bgColor.warning, bgColor.primary, bgColor.info, bgColor.light],
+        series: [statistics.hadir, statistics.sakit, statistics.izin, statistics.cuti, statistics.off || 0, statistics.na],
+        labels: ['Hadir', 'Sakit', 'Izin', 'Cuti', 'OFF', 'Tanpa Keterangan'],
+        colors: [bgColor.success, bgColor.warning, bgColor.primary, bgColor.info, bgColor.secondary, bgColor.light],
     }
 
     var chart = new ApexCharts(document.querySelector("#attendance_pie_chart"), options);
 
     chart.render();
+    
+    // Make chart accessible globally for refresh function
+    window.attendanceChart = chart;
+    
+    // Also make it accessible in Vue app instance
+    if (app) {
+        app.$data.chart = chart;
+    }
 </script>
 @endsection

@@ -297,6 +297,45 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="row mb-5">
+                            <div class="col-md-6">
+                                <div class="mb-8">
+                                    <label class="fs-6 fw-bold mb-3">Akses Sebagai</label>
+                                    <div class="d-flex">
+                                        <div class="form-check form-check-custom form-check-solid me-5">
+                                            <input class="form-check-input" type="radio" value="supervisor" v-model="account.model.mobileAccessAs" name="mobile-access-as" id="mobileAccessAs1" />
+                                            <label class="form-check-label" for="mobileAccessAs1">
+                                                Atasan
+                                            </label>
+                                        </div>
+                                        <div class="form-check form-check-custom form-check-solid">
+                                            <input class="form-check-input" type="radio" value="technician" v-model="account.model.mobileAccessAs" name="mobile-access-as" id="mobileAccessAs2" />
+                                            <label class="form-check-label" for="mobileAccessAs2">
+                                                Teknisi
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div :class="account.model.mobileAccessAs == 'supervisor' ? 'd-block' : 'd-none'">
+                                    <label class="fs-6 fw-bold mb-3">Outlet Yang Dikelola</label>
+                                    <div>
+                                        <select class="form-select form-select-sm" id="select-aerplus-offices" multiple>
+                                            @foreach($aerplus_offices as $aerplus_office)
+                                            <option value="{{ $aerplus_office->id }}">{{ $aerplus_office->name }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div class="mt-2">
+                                        <button type="button" class="btn btn-sm btn-light-primary me-2" @click="selectAllOffices">
+                                            <i class="bi bi-check-all"></i> Semua Outlet
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-light-danger" @click="clearAllOffices">
+                                            <i class="bi bi-x-circle"></i> Clear
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         <div v-if="account.model.allowMobileAccess" class="row">
                             <div class="col-md-6">
                                 <div>
@@ -628,6 +667,20 @@
                 } finally {
                     self.account.loading = false;
                 }
+            },
+            selectAllOffices() {
+                const self = this;
+                const allOfficeIds = [];
+                $('#select-aerplus-offices option').each(function() {
+                    allOfficeIds.push($(this).val());
+                });
+                $('#select-aerplus-offices').val(allOfficeIds).trigger('change');
+                self.account.model.accessibleOffices = allOfficeIds;
+            },
+            clearAllOffices() {
+                const self = this;
+                $('#select-aerplus-offices').val(null).trigger('change');
+                self.account.model.accessibleOffices = [];
             },
         },
         watch: {

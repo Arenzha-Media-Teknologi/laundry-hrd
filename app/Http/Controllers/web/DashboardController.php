@@ -179,40 +179,7 @@ class DashboardController extends Controller
         $startOfMonth = $currentDate->copy()->startOfMonth();
         $endOfMonth = $currentDate->copy()->endOfMonth();
 
-        // Get all late attendances in current month
-        $lateAttendances = Attendance::where('time_late', '>', 0)
-            ->where('status', 'hadir')
-            ->whereBetween('date', [$startOfMonth->toDateString(), $endOfMonth->toDateString()])
-            ->with(['employee' => function ($q) {
-                $q->with(['office' => function ($q2) {
-                    $q2->with(['division' => function ($q3) {
-                        $q3->with(['company']);
-                    }]);
-                }]);
-            }])
-            ->get();
-
-        // Group by employee and count late attendances
-        $employeeLateCounts = [];
-        foreach ($lateAttendances as $attendance) {
-            // Skip if employee is null (deleted employee)
-            if (!$attendance->employee) {
-                continue;
-            }
-
-            $employeeId = $attendance->employee_id;
-            if (!isset($employeeLateCounts[$employeeId])) {
-                $employeeLateCounts[$employeeId] = [
-                    'employee' => $attendance->employee,
-                    'count' => 0,
-                    'dates' => []
-                ];
-            }
-            $employeeLateCounts[$employeeId]['count']++;
-            $employeeLateCounts[$employeeId]['dates'][] = $attendance->date;
-        }
-
-        // Get active SP1 and SP2 for employees
+        // Get active SP1 and SP2 for employees (based on effective_start_date and effective_end_date)
         $activeSP1 = WarningLetter::where('type', 'sp1')
             ->where('effective_start_date', '<=', $currentDate->toDateString())
             ->where('effective_end_date', '>=', $currentDate->toDateString())
@@ -225,33 +192,109 @@ class DashboardController extends Controller
             ->pluck('employee_id')
             ->toArray();
 
-        // Categorize employees
+        // Helper function to group attendances by employee
+        $groupAttendancesByEmployee = function ($attendances) {
+            $employeeLateCounts = [];
+            foreach ($attendances as $attendance) {
+                // Skip if employee is null (deleted employee)
+                if (!$attendance->employee) {
+                    continue;
+                }
+
+                $employeeId = $attendance->employee_id;
+                if (!isset($employeeLateCounts[$employeeId])) {
+                    $employeeLateCounts[$employeeId] = [
+                        'employee' => $attendance->employee,
+                        'count' => 0,
+                        'dates' => []
+                    ];
+                }
+                $employeeLateCounts[$employeeId]['count']++;
+                $employeeLateCounts[$employeeId]['dates'][] = $attendance->date;
+            }
+            return $employeeLateCounts;
+        };
+
+        // Tab SP1: Absensi dengan warning_letter_created_at = null, warning_letter_type = null, telat >= 3, tidak ada SP aktif
+        $lateAttendancesForSP1 = Attendance::where('time_late', '>', 0)
+            ->where('status', 'hadir')
+            ->whereNull('warning_letter_created_at')
+            ->whereNull('warning_letter_type')
+            ->whereBetween('date', [$startOfMonth->toDateString(), $endOfMonth->toDateString()])
+            ->with(['employee' => function ($q) {
+                $q->with(['office' => function ($q2) {
+                    $q2->with(['division' => function ($q3) {
+                        $q3->with(['company']);
+                    }]);
+                }]);
+            }])
+            ->get();
+
+        $employeeLateCountsForSP1 = $groupAttendancesByEmployee($lateAttendancesForSP1);
         $threeTimesLate = [];
-        $twoTimesLateInSP1 = [];
-        $oneTimeLateInSP2 = [];
-
-        foreach ($employeeLateCounts as $employeeId => $data) {
-            $employee = $data['employee'];
-            $count = $data['count'];
-            $dates = $data['dates'];
-
-            if ($count >= 3) {
+        foreach ($employeeLateCountsForSP1 as $employeeId => $data) {
+            // Only show if count >= 3 and no active SP1 or SP2
+            if ($data['count'] >= 3 && !in_array($employeeId, $activeSP1) && !in_array($employeeId, $activeSP2)) {
                 $threeTimesLate[] = [
-                    'employee' => $employee,
-                    'count' => $count,
-                    'dates' => $dates
+                    'employee' => $data['employee'],
+                    'count' => $data['count'],
+                    'dates' => $data['dates']
                 ];
-            } elseif ($count >= 2 && in_array($employeeId, $activeSP1)) {
+            }
+        }
+
+        // Tab SP2: Absensi dengan warning_letter_created_at != null, warning_letter_type = 'sp1', telat >= 2, ada SP1 aktif
+        $lateAttendancesForSP2 = Attendance::where('time_late', '>', 0)
+            ->where('status', 'hadir')
+            ->whereNotNull('warning_letter_created_at')
+            ->where('warning_letter_type', 'sp2')
+            ->whereBetween('date', [$startOfMonth->toDateString(), $endOfMonth->toDateString()])
+            ->with(['employee' => function ($q) {
+                $q->with(['office' => function ($q2) {
+                    $q2->with(['division' => function ($q3) {
+                        $q3->with(['company']);
+                    }]);
+                }]);
+            }])
+            ->get();
+
+        $employeeLateCountsForSP2 = $groupAttendancesByEmployee($lateAttendancesForSP2);
+        $twoTimesLateInSP1 = [];
+        foreach ($employeeLateCountsForSP2 as $employeeId => $data) {
+            // Only show if count >= 2 and has active SP1
+            if ($data['count'] >= 2 && in_array($employeeId, $activeSP1)) {
                 $twoTimesLateInSP1[] = [
-                    'employee' => $employee,
-                    'count' => $count,
-                    'dates' => $dates
+                    'employee' => $data['employee'],
+                    'count' => $data['count'],
+                    'dates' => $data['dates']
                 ];
-            } elseif ($count >= 1 && in_array($employeeId, $activeSP2)) {
+            }
+        }
+
+        // Tab SP3: Absensi dengan warning_letter_created_at != null, warning_letter_type = 'sp2', telat >= 1, ada SP2 aktif
+        $lateAttendancesForSP3 = Attendance::where('time_late', '>', 0)
+            ->where('status', 'hadir')
+            ->whereNotNull('warning_letter_created_at')
+            ->where('warning_letter_type', 'sp3')
+            ->whereBetween('date', [$startOfMonth->toDateString(), $endOfMonth->toDateString()])
+            ->with(['employee' => function ($q) {
+                $q->with(['office' => function ($q2) {
+                    $q2->with(['division' => function ($q3) {
+                        $q3->with(['company']);
+                    }]);
+                }]);
+            }])
+            ->get();
+
+        $employeeLateCountsForSP3 = $groupAttendancesByEmployee($lateAttendancesForSP3);
+        $oneTimeLateInSP2 = [];
+        foreach ($employeeLateCountsForSP3 as $employeeId => $data) {
+            // Only show if count >= 1 and has active SP2
+            if ($data['count'] >= 1 && in_array($employeeId, $activeSP2)) {
                 $oneTimeLateInSP2[] = [
-                    'employee' => $employee,
-                    'count' => $count,
-                    'dates' => $dates
+                    'employee' => $data['employee'],
+                    'count' => $data['count'],
+                    'dates' => $data['dates']
                 ];
             }
         }

@@ -159,6 +159,9 @@ Route::controller(InspectionApiController::class)->prefix('inspections')->group(
 // Office
 Route::controller(OfficeApiController::class)->prefix('offices')->group(function () {
     Route::get('/', 'getAll');
+    Route::get('/daily-outlet-opening-report', 'getDailyOutletOpeningReport');
+    Route::get('/daily-outlet-opening-report/{officeId}', 'getDailyOutletOpeningReportDetail');
+    Route::get('/outlet-opening-statistics', 'getOutletOpeningStatistics');
 });
 
 // Announcement
